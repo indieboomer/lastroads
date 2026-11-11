@@ -1,0 +1,495 @@
+﻿extends Node3D
+
+const BUILD = "0.1.0-first-ember"
+const AREA = "old_pine_road"
+var player: CharacterBody3D
+var camera: Camera3D
+var blade: MeshInstance3D
+var enemy: Node3D
+var beacon: OmniLight3D
+var hud: Label
+var prompt: Label
+var overlay: Control
+var entry: TextEdit
+var status: Label
+var title: Control
+var hp := 100.0
+var stamina := 100.0
+var enemy_hp := 90.0
+var enemy_clock := 0.0
+var attack_cooldown := 0.0
+var elapsed := 0.0
+var supplies := false
+var restored := false
+var started := false
+var reporting := false
+var paused := false
+var events: Array = []
+var report_image: Image
+var report_snapshot: Dictionary
+var crate: Node3D
+var weapon_swing := 0.0
+var ui: CanvasLayer
+var sound: AudioStreamPlayer
+
+func tone(frequency: float, duration := 0.09) -> void:
+	var wave := AudioStreamWAV.new()
+	wave.format = AudioStreamWAV.FORMAT_16_BITS
+	wave.mix_rate = 22050
+	var bytes := PackedByteArray()
+	var count := int(22050*duration)
+	bytes.resize(count*2)
+	for i in range(count):
+		var sample := int(sin(float(i)*frequency*TAU/22050.0)*7000*(1.0-float(i)/count))
+		bytes.encode_s16(i*2,sample)
+	wave.data = bytes
+	sound.stream = wave
+	sound.play()
+
+func material(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.95
+	return m
+
+func box(at: Vector3, size: Vector3, color: Color, solid := true, parent: Node = self) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var shape := BoxMesh.new()
+	shape.size = size
+	mesh.mesh = shape
+	mesh.material_override = material(color)
+	parent.add_child(mesh)
+	mesh.position = at
+	if solid:
+		var body := StaticBody3D.new()
+		var hit := CollisionShape3D.new()
+		var bounds := BoxShape3D.new()
+		bounds.size = size
+		hit.shape = bounds
+		body.add_child(hit)
+		mesh.add_child(body)
+	return mesh
+
+func label_at(text: String, at: Vector3, color := Color("efca84")) -> void:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = 36
+	l.pixel_size = 0.009
+	l.modulate = color
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(l)
+	l.position = at
+
+func light_at(at: Vector3, color: Color, energy: float, radius: float) -> OmniLight3D:
+	var l := OmniLight3D.new()
+	l.light_color = color
+	l.light_energy = energy
+	l.omni_range = radius
+	add_child(l)
+	l.position = at
+	return l
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	seed(1776)
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color("344e59")
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = Color("98b3bb")
+	e.ambient_light_energy = 0.65
+	e.fog_enabled = true
+	e.fog_light_color = Color("344e59")
+	e.fog_density = 0.012
+	env.environment = e
+	add_child(env)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-28, -35, 0)
+	sun.light_color = Color("ffc98e")
+	sun.light_energy = 1.15
+	add_child(sun)
+	box(Vector3(0,-0.3,-20), Vector3(70,0.6,100), Color("283f36"))
+	box(Vector3(0,0.015,-20), Vector3(5,0.035,84), Color("81745b"), false)
+	for i in range(100):
+		var x := randf_range(5.5,30) * (-1 if i % 2 else 1)
+		var z := randf_range(-62,20)
+		box(Vector3(x,1.8,z), Vector3(0.65,3.6,0.65), Color("493f32"))
+		var tree := MeshInstance3D.new()
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.0
+		cone.bottom_radius = randf_range(1.6,2.7)
+		cone.height = randf_range(5.0,8.0)
+		cone.radial_segments = 7
+		tree.mesh = cone
+		tree.material_override = material(Color("234d43") if i%2 else Color("315a47"))
+		add_child(tree)
+		tree.position = Vector3(x,5,z)
+	# A warm inn with an open doorway and a small roadside yard.
+	box(Vector3(-6,2,9),Vector3(7,4,0.4),Color("826746"))
+	box(Vector3(-9.5,2,5),Vector3(0.4,4,8),Color("826746"))
+	box(Vector3(-6,2,1),Vector3(7,4,0.4),Color("826746"))
+	box(Vector3(-2.5,2,7.3),Vector3(0.4,4,3.4),Color("826746"))
+	box(Vector3(-2.5,2,1.8),Vector3(0.4,4,1.6),Color("826746"))
+	var roof := box(Vector3(-6,4.5,5),Vector3(8.2,0.5,10),Color("59372e"))
+	roof.rotation_degrees.z = -9
+	box(Vector3(-9.25,2,5),Vector3(0.1,1.5,2),Color("ffd18a"),false)
+	light_at(Vector3(-5,2.6,5),Color("ffb651"),3,12)
+	label_at("THE WAYFARER'S REST",Vector3(-2,4.1,5))
+	label_at("OLD PINE ROAD  /  NORTH",Vector3(0,3,-5))
+	# Ruined toll gate leaves a walkable gap.
+	for x in [-4.0,4.0]:
+		box(Vector3(x,2.2,-38),Vector3(2.8,4.4,3),Color("65746b"))
+		box(Vector3(x,4.6,-38),Vector3(3.2,0.4,3.4),Color("839080"))
+	box(Vector3(0,5,-38),Vector3(11,0.6,2),Color("65746b"))
+	label_at("THE FALLEN TOLL",Vector3(0,6,-38))
+	crate = Node3D.new()
+	add_child(crate)
+	crate.position = Vector3(0,0,-44)
+	box(Vector3(0,0.55,0),Vector3(1.6,1.1,1.1),Color("b18345"),true,crate)
+	box(Vector3(0,1.12,0),Vector3(1.7,0.1,1.2),Color("d0ab65"),false,crate)
+	label_at("STOLEN SUPPLIES",Vector3(0,2.3,-44))
+	box(Vector3(2,0.3,5),Vector3(1.5,0.6,1.5),Color("62675c"))
+	box(Vector3(2,1,5),Vector3(0.3,1.3,0.3),Color("d68b37"),false)
+	beacon = light_at(Vector3(2,1.7,5),Color("ffb34f"),0.5,10)
+	enemy = Node3D.new()
+	add_child(enemy)
+	enemy.position = Vector3(0,0,-33)
+	box(Vector3(0,1.05,0),Vector3(0.8,1.2,0.5),Color("763e3b"),false,enemy)
+	box(Vector3(0,1.95,0),Vector3(0.5,0.55,0.5),Color("b8a083"),false,enemy)
+	box(Vector3(0,2.26,0),Vector3(0.85,0.12,0.75),Color("342e30"),false,enemy)
+	for x in [-0.23,0.23]:
+		box(Vector3(x,0.3,0),Vector3(0.25,0.6,0.3),Color("303c3b"),false,enemy)
+	box(Vector3(0.6,1.1,0),Vector3(0.12,1.5,0.16),Color("b7c3bc"),false,enemy)
+	player = CharacterBody3D.new()
+	add_child(player)
+	player.position = Vector3(0,1,8)
+	var collision := CollisionShape3D.new()
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.35
+	capsule.height = 1.8
+	collision.shape = capsule
+	player.add_child(collision)
+	camera = Camera3D.new()
+	player.add_child(camera)
+	camera.position.y = 0.65
+	camera.fov = 78
+	blade = box(Vector3(0.5,-0.4,-0.8),Vector3(0.075,0.85,0.12),Color("c6d3cb"),false,camera)
+	blade.rotation_degrees.z = -18
+	box(Vector3(0.5,-0.78,-0.8),Vector3(0.4,0.06,0.18),Color("ba8d48"),false,camera)
+	make_ui()
+	sound = AudioStreamPlayer.new()
+	add_child(sound)
+	event("world_created")
+	if "--smoke" in OS.get_cmdline_user_args():
+		call_deferred("smoke")
+
+func event(message: String) -> void:
+	events.append({"time":snappedf(elapsed,0.01),"event":message})
+	if events.size()>100:
+		events.pop_front()
+
+func screen_label(text: String, at: Vector2, size: int, parent: Node) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.position = at
+	l.add_theme_font_size_override("font_size",size)
+	l.add_theme_color_override("font_color",Color("eee2c7"))
+	parent.add_child(l)
+	return l
+
+func make_ui() -> void:
+	ui = CanvasLayer.new()
+	ui.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(ui)
+	hud = screen_label("",Vector2(28,24),20,ui)
+	prompt = screen_label("",Vector2(28,610),22,ui)
+	screen_label("WASD move   SHIFT sprint   Mouse look   LMB strike   RMB block   E interact\nF5 save   F9 load   Esc pause   ` report a problem",Vector2(28,664),16,ui)
+	screen_label("+",Vector2(635,348),22,ui)
+	status = screen_label("",Vector2(28,560),18,ui)
+	title = Control.new()
+	ui.add_child(title)
+	var art := TextureRect.new()
+	art.texture = load("res://assets/last-roads.png")
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.size = Vector2(1280,720)
+	title.add_child(art)
+	var shade := ColorRect.new()
+	shade.color = Color(0.015,0.03,0.035,0.65)
+	shade.size = Vector2(1280,720)
+	title.add_child(shade)
+	screen_label("T H E   L A S T   R O A D S",Vector2(70,120),42,title)
+	screen_label("FIRST EMBER  /  playable increment 01",Vector2(74,183),20,title)
+	screen_label("The toll keeper has gone silent.\nRecover the stolen supplies beyond the old gate.\nReturn here and kindle the road beacon.\n\nA short solo expedition. One road. One second chance.",Vector2(74,260),24,title)
+	var begin := Button.new()
+	begin.text = "BEGIN EXPEDITION"
+	begin.position = Vector2(74,470)
+	begin.size = Vector2(300,58)
+	title.add_child(begin)
+	begin.pressed.connect(start)
+	screen_label("Press ` at any time to pause and record a problem.",Vector2(74,557),18,title)
+	overlay = Panel.new()
+	overlay.position = Vector2(270,160)
+	overlay.size = Vector2(740,390)
+	ui.add_child(overlay)
+	screen_label("FIELD NOTES / GAME PAUSED",Vector2(24,20),26,overlay)
+	screen_label("Describe the problem. Enter saves • Shift+Enter adds a line • Esc cancels",Vector2(24,65),17,overlay)
+	entry = TextEdit.new()
+	entry.position = Vector2(24,105)
+	entry.size = Vector2(692,205)
+	entry.placeholder_text = "What happened? What did you expect?"
+	overlay.add_child(entry)
+	screen_label("Screenshot + state + recent events → debug-logs",Vector2(24,330),18,overlay)
+	overlay.hide()
+
+func start() -> void:
+	started = true
+	title.hide()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	event("expedition_started")
+
+func _input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and not ev.echo:
+		if ev.physical_keycode == KEY_QUOTELEFT:
+			if not reporting:
+				open_report()
+			get_viewport().set_input_as_handled()
+			return
+		if reporting:
+			if ev.keycode == KEY_ESCAPE:
+				close_report()
+			elif ev.keycode == KEY_ENTER and not ev.shift_pressed:
+				submit_report()
+				get_viewport().set_input_as_handled()
+			return
+		if ev.keycode == KEY_ESCAPE and started:
+			paused = not paused
+			get_tree().paused = paused
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if paused else Input.MOUSE_MODE_CAPTURED
+			status.text = "PAUSED • Esc to resume" if paused else ""
+		if ev.keycode == KEY_F5 and started and not paused:
+			save_game()
+		if ev.keycode == KEY_F9 and started and not paused:
+			load_game()
+		if ev.physical_keycode == KEY_E and started and not paused:
+			interact()
+	if not started or paused or reporting:
+		return
+	if ev is InputEventMouseMotion:
+		player.rotate_y(-ev.relative.x*0.0025)
+		camera.rotation.x = clampf(camera.rotation.x-ev.relative.y*0.0025,-1.3,1.3)
+	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+		attack()
+
+func _physics_process(dt: float) -> void:
+	if not started or paused or reporting:
+		return
+	elapsed += dt
+	attack_cooldown = maxf(0,attack_cooldown-dt)
+	weapon_swing = maxf(0,weapon_swing-dt)
+	var blocking := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	blade.rotation.z = 1.15 if blocking else -0.3 + sin(weapon_swing*22)*0.8
+	var v := Vector2(float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)),float(Input.is_physical_key_pressed(KEY_S))-float(Input.is_physical_key_pressed(KEY_W)))
+	var sprint := Input.is_physical_key_pressed(KEY_SHIFT) and stamina>0 and v.length()>0
+	stamina = clampf(stamina+(-22 if sprint else 15)*dt,0,100)
+	var direction := player.basis*Vector3(v.x,0,v.y).normalized()
+	player.velocity.x = direction.x*(6 if sprint else 3.6)*(0.5 if blocking else 1.0)
+	player.velocity.z = direction.z*(6 if sprint else 3.6)*(0.5 if blocking else 1.0)
+	player.velocity.y -= 20*dt
+	player.move_and_slide()
+	player.position.x = clampf(player.position.x,-29,29)
+	player.position.z = clampf(player.position.z,-60,18)
+	if enemy_hp>0:
+		var distance := enemy.position.distance_to(player.position)
+		if distance<15:
+			enemy.look_at(Vector3(player.position.x,0,player.position.z),Vector3.UP)
+			if distance>2.1:
+				enemy.position += (Vector3(player.position.x,0,player.position.z)-enemy.position).normalized()*1.65*dt
+			else:
+				enemy_clock += dt
+				if enemy_clock>1.8:
+					enemy_clock = 0
+					var toward := (enemy.position-player.position).normalized()
+					var guarded := blocking and (-player.basis.z).dot(toward)>0.3
+					hp -= 3 if guarded else 17
+					tone(280 if guarded else 85)
+					event("blocked_hit" if guarded else "player_hit_17")
+					if hp<=0:
+						hp = 100
+						player.position = Vector3(0,1,8)
+						status.text = "The inn's ember restores you. Supplies and progress retained in this first slice."
+						event("respawn_at_inn")
+			enemy.scale = Vector3.ONE * (1.1 if enemy_clock>1.1 else 1.0)
+	hud.text = "THE LAST ROADS  /  FIRST EMBER\nHealth %d   •   Stamina %d   •   Warden %d\n%s" % [hp,stamina,maxf(enemy_hp,0),objective()]
+	prompt.text = ""
+	if player.position.distance_to(Vector3(0,1,-44))<3 and not supplies:
+		prompt.text = "[E] Recover the supplies" if enemy_hp<=0 else "Defeat the road warden before taking the supplies"
+	elif player.position.distance_to(Vector3(2,1,5))<3:
+		prompt.text = "[E] Kindle the beacon" if supplies and not restored else "The inn is safe. Recover supplies at the northern toll gate."
+	if enemy_clock>1.1 and enemy_hp>0 and enemy.position.distance_to(player.position)<3:
+		prompt.text = "WARDEN RAISES HIS BLADE — face him and hold RMB to block"
+	if restored:
+		prompt.text = "ROAD RESTORED • First Ember complete. F5 saves this world."
+
+func objective() -> String:
+	if restored:
+		return "Old Pine Road restored • the first connection is alive"
+	return "Return to the inn beacon [south]" if supplies else "Recover supplies at the ruined toll [north / follow the road]"
+
+func attack() -> void:
+	if attack_cooldown>0:
+		return
+	attack_cooldown = 0.55
+	weapon_swing = 0.28
+	event("player_attack")
+	var diff := enemy.position+Vector3(0,1,0)-camera.global_position
+	if enemy_hp>0 and diff.length()<3.2 and (-camera.global_basis.z).dot(diff.normalized())>0.65:
+		enemy_hp -= 30
+		tone(160)
+		enemy.position += Vector3(diff.x,0,diff.z).normalized()*0.3
+		event("warden_hit_30")
+		if enemy_hp<=0:
+			enemy.hide()
+			event("warden_defeated")
+			status.text = "The road falls quiet. The supplies are beyond the gate."
+
+func interact() -> void:
+	if player.position.distance_to(Vector3(0,1,-44))<3 and enemy_hp<=0 and not supplies:
+		supplies = true
+		crate.hide()
+		event("supplies_recovered")
+	if player.position.distance_to(Vector3(2,1,5))<3 and supplies and not restored:
+		restored = true
+		beacon.light_energy = 5
+		hp = 100
+		event("road_restored")
+		tone(660,0.3)
+		status.text = "The beacon burns again. A warm road home."
+
+func snapshot() -> Dictionary:
+	return {"schema_version":1,"build":BUILD,"engine":Engine.get_version_info().string,"area_id":AREA,"world_id":"first_ember_fixed","seed":1776,"generator_version":"authored-1","elapsed_seconds":elapsed,"player":{"position":[player.position.x,player.position.y,player.position.z],"yaw":player.rotation.y,"pitch":camera.rotation.x,"health":hp,"stamina":stamina,"profession":"warrior"},"world":{"supplies":supplies,"restored":restored,"enemy_health":enemy_hp,"enemy_position":[enemy.position.x,enemy.position.y,enemy.position.z],"enemy_attack_clock":enemy_clock},"objective":objective(),"recent_events":events.duplicate(true),"system":{"os":OS.get_name(),"video_adapter":RenderingServer.get_video_adapter_name(),"viewport":[get_viewport().size.x,get_viewport().size.y]}}
+
+func data_root() -> String:
+	return OS.get_executable_path().get_base_dir() if OS.has_feature("standalone") and not OS.has_feature("editor") else ProjectSettings.globalize_path("res://")
+
+func save_game() -> void:
+	var folder := data_root().path_join("saves")
+	DirAccess.make_dir_recursive_absolute(folder)
+	var f := FileAccess.open(folder.path_join("expedition.json"),FileAccess.WRITE)
+	if f == null:
+		status.text = "Save failed: " + error_string(FileAccess.get_open_error())
+		return
+	f.store_string(JSON.stringify(snapshot(),"\t"))
+	status.text = "Expedition saved."
+	event("manual_save")
+
+func load_game() -> void:
+	var path := data_root().path_join("saves/expedition.json")
+	if not FileAccess.file_exists(path):
+		status.text = "No saved expedition yet. Press F5 to save."
+		return
+	var d = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not d is Dictionary or d.get("schema_version") != 1 or d.get("area_id") != AREA:
+		status.text = "Unsupported or invalid save."
+		return
+	var p: Dictionary = d.player
+	var w: Dictionary = d.world
+	player.position = Vector3(p.position[0],p.position[1],p.position[2])
+	player.rotation.y = p.yaw
+	camera.rotation.x = p.pitch
+	hp = p.health
+	stamina = p.stamina
+	supplies = w.supplies
+	restored = w.restored
+	enemy_hp = w.enemy_health
+	enemy.position = Vector3(w.enemy_position[0],w.enemy_position[1],w.enemy_position[2])
+	enemy_clock = w.enemy_attack_clock
+	elapsed = d.elapsed_seconds
+	enemy.visible = enemy_hp>0
+	crate.visible = not supplies
+	beacon.light_energy = 5 if restored else 0.5
+	events = d.recent_events
+	event("manual_load")
+	status.text = "Expedition restored."
+
+func open_report() -> void:
+	# Capture the last completed gameplay frame before drawing the dialog.
+	report_image = get_viewport().get_texture().get_image()
+	report_snapshot = snapshot()
+	reporting = true
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	entry.text = ""
+	overlay.show()
+	entry.grab_focus()
+
+func close_report() -> void:
+	overlay.hide()
+	reporting = false
+	get_tree().paused = paused
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if started and not paused else Input.MOUSE_MODE_VISIBLE
+
+func submit_report() -> void:
+	if entry.text.strip_edges().is_empty():
+		entry.placeholder_text = "Please describe the problem before saving."
+		return
+	var stamp := Time.get_datetime_string_from_system().replace(":","-") + "-" + str(Time.get_ticks_usec())
+	var folder := data_root().path_join("debug-logs").path_join(stamp)
+	var err := DirAccess.make_dir_recursive_absolute(folder)
+	if err != OK:
+		status.text = "Report folder failed: " + error_string(err)
+		return
+	var image_err := report_image.save_png(folder.path_join("screenshot.png"))
+	var f := FileAccess.open(folder.path_join("report.json"),FileAccess.WRITE)
+	if f == null or image_err != OK:
+		status.text = "Report write failed; note kept open. Check folder permissions."
+		return
+	report_snapshot["note"] = entry.text.strip_edges()
+	report_snapshot["captured_at"] = stamp
+	report_snapshot["screenshot"] = "screenshot.png"
+	f.store_string(JSON.stringify(report_snapshot,"\t"))
+	f.close()
+	var note := FileAccess.open(folder.path_join("note.txt"),FileAccess.WRITE)
+	if note != null:
+		note.store_string(report_snapshot.note)
+	status.text = "Field note saved: debug-logs/"+stamp
+	event("debug_report_saved")
+	close_report()
+
+func smoke() -> void:
+	start()
+	await get_tree().process_frame
+	player.position = enemy.position+Vector3(0,1,2.2)
+	player.rotation.y = 0
+	attack()
+	assert(enemy_hp == 60)
+	attack()
+	assert(enemy_hp == 60, "Attack cooldown prevents repeated damage")
+	attack_cooldown = 0
+	attack()
+	attack_cooldown = 0
+	attack()
+	assert(enemy_hp == 0)
+	player.position = Vector3(0,1,-44)
+	interact()
+	assert(supplies)
+	player.position = Vector3(2,1,5)
+	interact()
+	assert(restored)
+	save_game()
+	hp = 7
+	load_game()
+	assert(hp == 100 and supplies and restored)
+	await get_tree().physics_frame
+	await RenderingServer.frame_post_draw
+	open_report()
+	var before := elapsed
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(elapsed == before)
+	entry.text = "Automated smoke: restoration, save/load and paused diagnostic capture."
+	submit_report()
+	assert(not reporting and not get_tree().paused)
+	print("SMOKE PASS: quest, persistence, paused report and screenshot")
+	get_tree().quit()

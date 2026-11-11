@@ -1,0 +1,87 @@
+Optional Intimacy and Character Keepsakes
+Design intent
+Add optional, discreet romantic and intimate encounters with selected adult NPCs. The tone should combine earthy humour, affection, temptation and the religious sensibilities of the game's alternative Renaissance setting.
+
+Encounters are suggested through dialogue, restrained changes in character presentation and a cinematic fade to black. Sexual activity is never shown or described explicitly.
+
+This is a secondary character interaction system. It must not become necessary for progression, an efficient way to obtain combat bonuses, or the default interaction with female characters.
+Eligibility and consent
+- Every participating NPC and player character must be unambiguously an adult.
+- Enable encounters only for explicitly authored NPCs. Do not automatically apply the system to the entire cast.
+- The Sister is excluded.
+- A completed quest may unlock a more personal conversation. Intimacy is a separate mutual choice, never payment owed for completing the quest.
+- Invitations require a suitable relationship, narrative context and private location.
+- Exclude coercion, threats, captivity and incapacitating intoxication.
+- The player can decline gracefully without losing quest rewards, services or progression.
+- Include a final confirmation before the transition. Acceptance of flirtation alone is not acceptance of an intimate encounter.
+NPCs should retain their own preferences and boundaries. Not every flirtation succeeds.
+Encounter flow
+1. A quest or relationship milestone unlocks an optional personal dialogue branch.
+2. The NPC expresses interest in language consistent with their personality and the setting.
+3. The player may reciprocate, keep the exchange playful, or decline.
+4. If both agree, the conversation establishes a private place and an appropriate moment.
+5. Show a brief, non-explicit visual change: a warmer expression, a removed hat or outer cloak, loosened hair, or a modest adjustment to clothing. Keep the character covered.
+6. Fade to black before any sexual activity. Use a brief musical transition or ambient sound; no sexual sound effects.
+7. Fade back into an ordinary aftermath: a quiet conversation, a shared drink, a knowing smile or a return to everyday business.
+8. Unlock a character keepsake card after the first completed encounter.
+Avoid prescribing a universal duration or time-of-day change. Any time advance must follow the world's existing simulation rules.
+Religious and social tone
+NPCs understand that such invitations may be considered improper or sinful. Express this through discretion, hesitation, humour or conflicting feelings rather than a repeated morality speech.
+
+Different personalities respond differently: one jokes about confession, another values privacy, another openly acknowledges desire while remaining sincere in their faith. Christianity must remain part of their lived worldview.
+
+Possible dialogue:
+“Stay a little longer. I have better wine upstairs—and less respectable reasons for asking.”
+
+“I ought to send you on your way. Heaven forgive me, I would rather you stayed.”
+
+“Let the village keep its opinions. Still… use the side door.”
+
+Possible player responses:
+- “If you are certain, I would like to stay.”
+- “A drink and your company. Nothing more tonight.”
+- “You flatter me, but I should go.”
+Do not make every religious character hypocritical or every intimate encounter an occasion for shame.
+Same-sex encounters
+Support authored same-sex invitations and encounters using the same consent rules, presentation quality and keepsake system.
+
+Use approximately 10% of authored encounter opportunities as an initial content-planning target for specifically same-sex encounters. This is an editorial distribution, not a random probability rolled whenever the player speaks to an NPC.
+
+Define each participating NPC's preferences consistently. Do not reroll attraction after loading a save, and do not infer it solely from the player's current appearance.
+
+Social discretion may shape individual scenes, but same-sex intimacy must not automatically trigger ridicule, punishment, betrayal or a darker outcome.
+Character keepsake cards
+The card records a personal memory, inspired by the collectible structure of the first Witcher, with an original visual treatment.
+
+Each card contains:
+- An original painted portrait of the NPC.
+- Their name and a short, character-specific title.
+- A brief non-explicit recollection or quotation.
+- The location of the encounter, where appropriate.
+Portraits may show relaxed clothing, loose hair or a private smile, while remaining covered and consistent with the Old Master art direction. Do not use explicit imagery or copy existing Witcher artwork.
+
+Store cards in the individual player's journal. Avoid conquest counters, rarity rankings, collection bonuses or achievements requiring intimacy. Repeated encounters must not produce duplicate cards or farmable rewards.
+Co-op behaviour
+An encounter belongs to the initiating player.
+- Never pause the shared world or fade other players' screens.
+- Other players must not be pulled into the encounter or receive its card.
+- Use a short, safely staged private transition.
+- Recheck safety before committing. If combat or another invalidating event occurs beforehand, postpone the encounter.
+- Commit completion and the card unlock atomically to prevent duplication after disconnects or reloads.
+- Keep intimate dialogue and journal details private to the participating player by default.
+Implementation and acceptance
+Implement the feature as data-driven dialogue branches with explicit adult eligibility, attraction preferences, relationship requirements, quest conditions, location checks and completion flags.
+
+Provide a player setting to disable intimate invitations and their presentation without removing ordinary friendship dialogue or quest content.
+
+The first implementation should contain one complete encounter, its decline path, its fade transition, its aftermath and one keepsake card. Validate this flow before expanding the roster.
+
+Acceptance requires:
+- Clear adult eligibility and mutual consent.
+- Graceful refusal with no progression penalty.
+- No explicit sexual visuals, descriptions or audio.
+- Setting-appropriate dialogue and individual personality.
+- Stable NPC preferences across saves.
+- Correct per-player co-op state.
+- No duplicate cards or repeatable mechanical advantage.
+- No intimate content assigned to the Sister.

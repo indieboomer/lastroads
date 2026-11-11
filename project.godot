@@ -1,0 +1,78 @@
+config_version=5
+
+[application]
+config/name="The Last Roads - Bells of the Hollow"
+run/main_scene="res://loading.tscn"
+config/version="0.15.5"
+config/icon="res://assets/game-icon.svg"
+boot_splash/show_image=true
+boot_splash/image="res://assets/ui/loading-splash-copper-pine.png"
+boot_splash/fullsize=true
+boot_splash/bg_color=Color(0.035, 0.065, 0.08, 1)
+config/features=PackedStringArray("4.5", "GL Compatibility")
+
+[display]
+window/size/mode=3
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/size=2048
+environment/defaults/default_clear_color=Color(0.035, 0.065, 0.08, 1)
+
+[shader_globals]
+
+road_scream_position={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+road_scream_strength={
+"type": "float",
+"value": 0.0
+}
+
+road_time={
+"type": "float",
+"value": 0.0
+}
+road_wind={
+"type": "float",
+"value": 0.5
+}
+road_clouds={
+"type": "float",
+"value": 0.05
+}
+road_flash={
+"type": "float",
+"value": 0.0
+}
+road_rain={
+"type": "float",
+"value": 0.0
+}
+
+road_fog_colour={
+"type": "color",
+"value": Color(0.43, 0.56, 0.61, 1)
+}
+road_fog_density={
+"type": "float",
+"value": 0.0035
+}
+road_daylight={
+"type": "float",
+"value": 1.0
+}
+
+[debug]
+file_logging/enable_file_logging=true
+file_logging/log_path="user://logs/last-roads.log"
+file_logging/max_log_files=3
+
+[coop]
+steam_app_id=480
