@@ -27,7 +27,7 @@ func run(g: Node) -> void:
 		verify(not FileAccess.file_exists("res://controls.cfg"))
 		verify(g.data_root()==OS.get_executable_path().get_base_dir())
 	verify(g.audio.library.sources.size()==94)
-	verify(g.audio.tracks.size()==5)
+	verify(g.audio.tracks.size()==g.audio.TRACKS.size())
 	# Load and round-trip copies of real older saves; never touch the originals.
 	for file in DirAccess.get_files_at(g.data_root().path_join("reports/upgrade-fixtures")):
 		if not file.ends_with(".json"): continue
@@ -77,7 +77,7 @@ func run(g: Node) -> void:
 	g.ui.report_entry.text = "AUTOMATED standalone distribution: authorized friend-based NPC artwork, imported assets, save/load and paused bug report."
 	verify(g.submit_report())
 	verify(g.world.library.portrait("ilya")==g.world.library.portrait("ilya"))
-	print("RELEASE CHECK PASS: fullscreen/F11 and fresh Copper & Pine/Fine/dither 50%/grain 30%; authorized friend-based NPC paintings and portraits at world scale/original/Copper/Macintosh, 94 packaged recordings/five tracks, writable save-load/diagnostics, photo/settings exclusion in standalone")
+	print("RELEASE CHECK PASS: fullscreen/F11 and fresh Copper & Pine/Fine/dither 50%/grain 30%; authorized friend-based NPC paintings and portraits at world scale/original/Copper/Macintosh, 94 packaged recordings/six tracks, writable save-load/diagnostics, photo/settings exclusion in standalone")
 	g.get_tree().quit()
 
 

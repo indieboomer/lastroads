@@ -80,7 +80,7 @@ func prepare(mode: String, profile: Dictionary, color: String, address := "127.0
 	joined_at = Time.get_ticks_msec()/1000.0
 	game.start_new(profile)
 	# Co-op files have their own paths; solo saves are never replaced.
-	if is_host and FileAccess.file_exists(game.save_path()): game.load_game()
+	if is_host and game.saves.has_resume(): game.load_game(game.saves.resume_info().path)
 	hello_profile = game.state.profile.duplicate(true)
 	if is_host:
 		_register_local()
@@ -262,6 +262,9 @@ func near_portal(p: Array) -> bool:
 	var at := Vector2(p[0],p[2])
 	for destination in [Vector2(0,42),Vector2(-65,-514),Vector2(130,-368),Vector2(132,-216)]:
 		if at.distance_to(destination)<8: return true
+	if game.state.woods.started:
+		for destination in [Vector2(-7,-1081),Vector2(-143,-1316),Vector2(17,-1630)]:
+			if at.distance_to(destination)<8: return true
 	if game.state.story.ferry_fixed:
 		for destination in [Vector2(-61,-518),Vector2(135,-594),Vector2(7,-334)]:
 			if at.distance_to(destination)<8: return true
@@ -286,7 +289,7 @@ func _welcome(data: Dictionary) -> void:
 	_set_roster(data.roster)
 	if not roster.has(transport.local_id): return
 	# Load only this visitor's private character record, then apply the host world.
-	if FileAccess.file_exists(game.save_path()): game.load_game()
+	if game.saves.has_resume(): game.load_game(game.saves.resume_info().path)
 	game.player.position = Vector3(data.spawn[0],data.spawn[1],data.spawn[2])
 	_world(data.world)
 	session_ready = true
@@ -348,6 +351,9 @@ func world_record(include_enemies := true) -> Dictionary:
 	var story: Dictionary = game.state.story.duplicate(true)
 	story.erase("track")
 	var record := {"flags":flags,"story":story,"taken":game.state.taken.duplicate(),"defeated":game.state.defeated.duplicate(),"fires":game.state.fires.duplicate(true),"clock":game.state.day_clock,"weather":game.state.weather.duplicate()}
+	record.woods = game.state.woods.duplicate(true)
+	record.woods.erase("focus")
+	record.woods.erase("track")
 	record.weeper_world = game.state.weeper_world.duplicate(true)
 	if include_enemies: record.enemies = enemy_frame()
 	return record
@@ -418,6 +424,9 @@ func _apply_enemies(records: Dictionary) -> void:
 				enemy.visual.position.y = enemy.spec.height*.5
 
 func _world(data: Dictionary) -> void:
+	var woods_record: Dictionary = game.state.woods.duplicate(true)
+	if data.get("woods") is Dictionary: woods_record.merge(data.woods,true)
+	if not game.woods.valid(woods_record): return
 	if not preload("res://scripts/weeper_sites.gd").valid(data.get("weeper_world",preload("res://scripts/weeper_sites.gd").DEFAULTS)): return
 	if not data.get("flags") is Dictionary or not data.get("story") is Dictionary or not data.get("taken") is Dictionary: return
 	for key in WORLD_FLAGS:
@@ -427,13 +436,14 @@ func _world(data: Dictionary) -> void:
 	if not data.get("fires") is Array or data.fires.size()>128: return
 	for fire in data.fires:
 		if not fire is Dictionary or not valid_point(fire.get("position")) or not fire.get("fuel") is float or not is_finite(fire.fuel) or fire.fuel<0 or fire.fuel>240: return
-	var scenery_changed: bool = game.state.taken!=data.taken or game.state.fires.size()!=data.fires.size()
+	var scenery_changed: bool = game.state.woods!=woods_record or game.state.taken!=data.taken or game.state.fires.size()!=data.fires.size()
 	for key in WORLD_FLAGS:
 		if game.state.flags[key]!=data.flags[key]: scenery_changed = true
 	for key in data.story:
 		if game.state.story[key]!=data.story[key]: scenery_changed = true
 	for key in WORLD_FLAGS: game.state.flags[key] = data.flags[key]
 	for key in data.story: game.state.story[key] = data.story[key]
+	game.state.woods = woods_record
 	game.state.weeper_world = data.get("weeper_world",preload("res://scripts/weeper_sites.gd").DEFAULTS).duplicate(true)
 	game.state.taken = data.taken.duplicate()
 	game.state.fires = data.fires.duplicate(true)
@@ -453,7 +463,7 @@ func transact(kind: String, id: String, method: String, args: Array) -> void:
 	game.callv(method,args)
 	if before.is_empty(): return
 	var after := world_record()
-	var changes := {"flags":{},"story":{},"taken":{}}
+	var changes := {"flags":{},"story":{},"woods":{},"taken":{}}
 	for section in changes:
 		for key in after[section]:
 			if before[section].get(key)!=after[section][key]: changes[section][key] = after[section][key]
@@ -481,7 +491,16 @@ func _world_change(sender: int, data: Dictionary) -> void:
 	elif kind!="camp": return
 	var changes: Dictionary = data.changes
 	if not changes.get("flags") is Dictionary or not changes.get("story") is Dictionary or not changes.get("taken") is Dictionary: return
-	if kind=="camp" and (not changes.flags.is_empty() or not changes.story.is_empty() or not changes.taken.is_empty()): return
+	var woods_change: Variant = changes.get("woods",{})
+	if not woods_change is Dictionary: return
+	if not woods_change.is_empty() and not (data.id in game.woods.D.NPCS or data.id.begins_with("nw_") or data.id in ["nera","anselm"]): return
+	var next_woods: Dictionary = game.state.woods.duplicate(true)
+	for key in woods_change:
+		if not next_woods.has(key) or key in ["track","focus"] or typeof(woods_change[key])!=typeof(next_woods[key]): return
+		if next_woods[key] is bool: next_woods[key] = next_woods[key] or woods_change[key]
+		elif next_woods[key] is String and next_woods[key].is_empty(): next_woods[key] = woods_change[key]
+	if not game.woods.valid(next_woods): return
+	if kind=="camp" and (not changes.flags.is_empty() or not changes.story.is_empty() or not changes.taken.is_empty() or not woods_change.is_empty()): return
 	for key in changes.flags:
 		if key not in WORLD_FLAGS or not changes.flags[key] is bool: return
 	for key in changes.story:
@@ -494,6 +513,8 @@ func _world_change(sender: int, data: Dictionary) -> void:
 		var current: Variant = game.state.story[key]
 		if current is bool: game.state.story[key] = current or changes.story[key]
 		elif current is String and current.is_empty(): game.state.story[key] = changes.story[key]
+	game.state.woods = next_woods
+	game.woods.ensure_encounters()
 	game.state.taken.merge(changes.taken)
 	if data.get("spawns") is Array:
 		for spawn in data.spawns:
@@ -589,6 +610,7 @@ func host_while_busy(dt: float) -> void:
 	game.state.elapsed += dt
 	game.state.day_clock = fposmod(game.state.day_clock+dt/60.0,24)
 	game.march.tick(dt)
+	game.woods.tick(dt)
 	for enemy in game.enemies: tick_enemy(enemy,dt)
 	game.world.tick(dt)
 	game.weather.tick(dt)

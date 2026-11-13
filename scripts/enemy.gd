@@ -41,8 +41,8 @@ func setup(owner_game: Node, uid: String, family: String, at: Vector3) -> void:
 	position = at+Vector3(0,0.05,0)
 	var collision := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
-	capsule.height = spec.height if kind in ["guardian","mournkeeper","wraith","pitchbound","boughstalker","hollow_weeper"] else 1.7 if kind!="wolf" else 1.0
-	capsule.radius = 0.85 if kind in ["guardian","mournkeeper"] else 0.42
+	capsule.height = spec.height if kind in ["guardian","mournkeeper","rootwarden","wraith","pitchbound","boughstalker","hollow_weeper"] else 1.7 if kind!="wolf" else 1.0
+	capsule.radius = 0.85 if kind in ["guardian","mournkeeper","rootwarden"] else 0.42
 	if kind=="hollow_weeper": capsule.radius *= 1.2
 	if capsule.height<capsule.radius*2:
 		capsule.height = capsule.radius*2
@@ -80,6 +80,7 @@ func setup(owner_game: Node, uid: String, family: String, at: Vector3) -> void:
 			dead = true
 			hide()
 			collision_layer = 0
+	if kind=="rootwarden": shielded = not game.woods.wards_open()
 	if dead and not game.state.looted.has(id):
 		show_corpse()
 	if not dead: forest_presence(true)
@@ -171,7 +172,7 @@ func tick(dt: float) -> void:
 	elif stun>0:
 		visual.modulate = Color(0.6,1.0,1.2)
 	var hm: ShaderMaterial = halo.material_override
-	shielded = kind=="guardian" and game.enemies.any(func(e): return not e.dead and e.id.begins_with(id+"_echo"))
+	shielded = kind=="guardian" and game.enemies.any(func(e): return not e.dead and e.id.begins_with(id+"_echo")) or kind=="rootwarden" and not game.woods.wards_open()
 	hm.set_shader_parameter("color",Color(0.2,0.75,1.0,0.7) if shielded else Color(1,0.24,0.04,0.5 if phase=="windup" else 0))
 	var light_fearing: bool = kind in ["pitchbound","boughstalker","wraith"]
 	if light_fearing and phase in ["windup","recover"]: engaged = true
@@ -235,7 +236,7 @@ func tick(dt: float) -> void:
 		elif distance>0.1:
 			var speed: float = spec.speed
 			if kind=="boughstalker" and distance>3 and distance<9: speed *= 1.4
-			if rimed>0: speed *= 0.85 if kind in ["guardian","mournkeeper"] else 0.45
+			if rimed>0: speed *= 0.85 if kind in ["guardian","mournkeeper","rootwarden"] else 0.45
 			if kind=="wraith" and game.fire_distance(global_position)<8:
 				speed *= 0.15
 			velocity.x = diff.normalized().x*speed
@@ -265,7 +266,7 @@ func hit(amount: float, heavy := false, physical := true) -> void:
 		return
 	if shielded:
 		game.audio.play_effect("block")
-		game.message("THE ECHO WARD · Defeat the spirits feeding the Warden's blue shield.",3)
+		game.message("THE ROOT DEBT / Open the three binding knots around the oak." if kind=="rootwarden" else "THE ECHO WARD · Defeat the spirits feeding the Warden's blue shield.",3)
 		return
 	health -= amount
 	if game.weeper_director: game.weeper_director.observe_kind(kind)
@@ -276,7 +277,7 @@ func hit(amount: float, heavy := false, physical := true) -> void:
 		phase = "chase"
 		clock = 0.0
 	hit_flash = 0.22
-	stun = 0.8 if heavy and kind not in ["guardian","mournkeeper","hollow_weeper"] else stun
+	stun = 0.8 if heavy and kind not in ["guardian","mournkeeper","rootwarden","hollow_weeper"] else stun
 	game.state.log_event("hit:%s:%d" % [id,amount])
 	if physical: game.audio.play_effect("hit",position+Vector3.UP)
 	if health>0: game.audio.enemy_event(kind,"hurt",position+Vector3.UP,id)
@@ -310,7 +311,7 @@ func show_corpse() -> void:
 		return
 	visual.texture = game.world.library.cell("res://assets/revision/corpses.png",spec.cell,2,2)
 	(visual.material_override as ShaderMaterial).set_shader_parameter("image",visual.texture)
-	visual.pixel_size = (3.6 if kind in ["guardian","mournkeeper"] else 2.3 if kind=="bandit" else 1.8)/visual.texture.get_width()
+	visual.pixel_size = (3.6 if kind in ["guardian","mournkeeper","rootwarden"] else 2.3 if kind=="bandit" else 1.8)/visual.texture.get_width()
 	visual.position = Vector3(0,visual.texture.get_height()*visual.pixel_size/2-0.02,0)
 	visual.rotation = Vector3.ZERO
 	visual.modulate = Color.WHITE
@@ -340,6 +341,10 @@ func search_body() -> void:
 		"wraith":
 			pack.essence += 1
 			description = "a mote of pale essence"
+		"rootwarden":
+			pack.resin_tear += 1
+			pack.essence += 3
+			description = "a resin tear and three motes of pale essence"
 		"guardian", "mournkeeper":
 			pack.gold += 35
 			pack.essence += 3
@@ -351,7 +356,7 @@ func search_body() -> void:
 
 func force_reaction(direction: Vector3, strength: float, duration: float, stagger: float) -> void:
 	if dead or shielded: return
-	if kind in ["guardian","mournkeeper"]:
+	if kind in ["guardian","mournkeeper","rootwarden"]:
 		poise = minf(2.0,poise+stagger)
 		poise_clock = 6.0
 		if poise>=2.0 and phase=="windup" and clock<spec.windup*0.65:

@@ -6,6 +6,12 @@ if (-not (Test-Path -LiteralPath $engine)) { & (Join-Path $PSScriptRoot 'setup.p
 New-Item -ItemType Directory -Path (Join-Path $projectRoot '.godot') -Force | Out-Null
 & $engine --headless --path $projectRoot --editor --import --quit --log-file (Join-Path $projectRoot '.godot/check-import.log') | Out-Null
 $checks = @(
+    @{ Name = 'safety'; Arg = '--safety-check'; Pass = 'SAFETY PASS'; Limit = 150 },
+    @{ Name = 'journal'; Arg = '--journal-check'; Pass = 'JOURNAL PASS'; Limit = 150 },
+    @{ Name = 'levels'; Arg = '--level-check'; Pass = 'LEVEL PASS'; Limit = 150 },
+    @{ Name = 'woods'; Arg = '--woods-check'; Pass = 'WOODS PASS'; Limit = 180 },
+    @{ Name = 'woods-route'; Arg = '--woods-route'; Pass = 'WOODS ROUTE PASS'; Limit = 240 },
+    @{ Name = 'side-quests'; Arg = '--side-quest-check'; Pass = 'SIDE QUEST PASS'; Limit = 150 },
     @{ Name = 'controls'; Arg = '--controls-check'; Pass = 'CONTROLS PASS'; Limit = 150 },
     @{ Name = 'journey'; Arg = '--journey-check'; Pass = 'JOURNEY PASS'; Limit = 150 },
     @{ Name = 'splash'; Arg = '--splash-check'; Pass = 'SPLASH PASS'; Limit = 150 },

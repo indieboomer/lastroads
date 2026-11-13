@@ -2,9 +2,9 @@ extends RefCounted
 
 const STEP := 2.5
 const MIN_X := -250.0
-const MIN_Z := -1030.0
+const MIN_Z := -1870.0
 const WIDTH := 201
-const DEPTH := 455
+const DEPTH := 791
 const BIN := 32.0
 # Flat inner rectangles include porches, approaches, bridge banks and water.
 const PADS := [
@@ -15,7 +15,11 @@ const PADS := [
 	[Vector2(0,-435),Vector2(72,23)], [Vector2(-68,-531),Vector2(40,32)],
 	[Vector2(-200,-630),Vector2(35,39)], [Vector2(147,-619),Vector2(66,46)],
 	[Vector2(180,-764),Vector2(35,37)], [Vector2(-166,-805),Vector2(40,32)],
-	[Vector2(0,-950),Vector2(40,39)]
+	[Vector2(0,-950),Vector2(40,39)],
+	[Vector2(0,-1100),Vector2(48,48)], [Vector2(137,-1225),Vector2(45,45)],
+	[Vector2(-150,-1335),Vector2(35,35)], [Vector2(165,-1400),Vector2(35,35)],
+	[Vector2(-150,-1525),Vector2(45,65)], [Vector2(143,-1560),Vector2(30,32)],
+	[Vector2(30,-1645),Vector2(38,35)], [Vector2(-95,-1770),Vector2(40,35)]
 ]
 var noise := FastNoiseLite.new()
 var heights := PackedFloat32Array()

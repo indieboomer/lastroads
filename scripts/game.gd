@@ -20,10 +20,13 @@ const Audio = preload("res://scripts/audio.gd")
 var controls = preload("res://scripts/input_controls.gd").new()
 var controls_view: CanvasLayer
 var visuals = preload("res://scripts/visual_settings.gd").new()
+var saves = preload("res://scripts/save_slots.gd").new()
 var state = State.new()
 var weeper_director: Node
 var player_stagger := 0.0
 var coop: Node
+var woods = preload("res://scripts/woods.gd").new()
+var side_quests = preload("res://scripts/side_quests.gd").new()
 var march = preload("res://scripts/march.gd").new()
 var combat = preload("res://scripts/profession_combat.gd").new()
 var ranger = preload("res://scripts/ranger_combat.gd").new()
@@ -66,12 +69,17 @@ var swing_duration := 0.27
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	saves.game = self
 	combat.game = self
 	ranger.game = self
 	relationship.game = self
+	woods.game = self
+	side_quests.game = self
 	march.game = self
 	journey.game = self
 	test_mode = Array(OS.get_cmdline_user_args()).any(func(arg): return arg in ["--grass-check","--quest-access-check","--march-field-check","--field-check","--architecture-check","--release-check","--profession-check","--profession-encounters","--sound-check","--terrain-check","--living-check","--march-check","--march-route","--production-check","--smoke","--tour","--route","--combat-check","--feedback-check","--visual-check","--forest-check","--survival-check"])
+	test_mode = Array(OS.get_cmdline_user_args()).any(func(arg): return arg in ["--safety-check","--journal-check","--level-check","--woods-check","--woods-preview","--woods-capture","--woods-route"]) or test_mode
+	test_mode = "--side-quest-check" in OS.get_cmdline_user_args() or test_mode
 	test_mode = "--weeper-check" in OS.get_cmdline_user_args() or test_mode
 	test_mode = "--godrays-check" in OS.get_cmdline_user_args() or test_mode
 	test_mode = "--romance-check" in OS.get_cmdline_user_args() or "--coop-check" in OS.get_cmdline_user_args() or "--coop-probe" in OS.get_cmdline_user_args() or test_mode
@@ -108,7 +116,7 @@ func _ready() -> void:
 	ui.add_child(ui.coop_menu)
 	ui.coop_menu.build()
 	await loading_stage("Gathering travellers and creatures…")
-	ui.title_continue.disabled = not FileAccess.file_exists(save_path())
+	ui.title_continue.disabled = not saves.has_resume()
 	spawn_enemies()
 	await loading_stage("Lighting the sky…")
 	weather = preload("res://scripts/weather.gd").new()
@@ -142,6 +150,22 @@ func _ready() -> void:
 		call_deferred("wilderness_check")
 	elif "--grass-check" in OS.get_cmdline_user_args():
 		call_deferred("grass_check")
+	elif "--safety-check" in OS.get_cmdline_user_args():
+		call_deferred("safety_check")
+	elif "--journal-check" in OS.get_cmdline_user_args():
+		call_deferred("journal_check")
+	elif "--level-check" in OS.get_cmdline_user_args():
+		call_deferred("level_check")
+	elif "--woods-check" in OS.get_cmdline_user_args():
+		call_deferred("woods_check")
+	elif "--woods-capture" in OS.get_cmdline_user_args():
+		call_deferred("woods_capture")
+	elif "--woods-route" in OS.get_cmdline_user_args():
+		call_deferred("woods_route")
+	elif "--woods-preview" in OS.get_cmdline_user_args():
+		call_deferred("woods_preview")
+	elif "--side-quest-check" in OS.get_cmdline_user_args():
+		call_deferred("side_quest_check")
 	elif "--quest-access-check" in OS.get_cmdline_user_args():
 		call_deferred("quest_access_check")
 	elif "--march-field-check" in OS.get_cmdline_user_args():
@@ -264,6 +288,8 @@ func start_new(profile: Dictionary = {}) -> void:
 	combat.reset()
 	relationship.cancel()
 	state = State.new()
+	saves.reset()
+	ui.reset_progression()
 	if weeper_director: weeper_director.announced = false
 	player_stagger = 0.0
 	if not profile.is_empty():
@@ -294,6 +320,7 @@ func start_new(profile: Dictionary = {}) -> void:
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	state.log_event("new_journey")
+	saves.request("A new journey")
 	state.discovered.inn = true
 	journey.reset()
 	ui.discover("Wayfarer's Rest","Talk to Mara, by the lantern in the inn yard")
@@ -301,7 +328,8 @@ func start_new(profile: Dictionary = {}) -> void:
 	message("%s to talk / %s journal / %s quick slots and road actions" % [controls.hint("interact"),controls.hint("map"),controls.hint("tools")],8)
 
 func continue_game() -> void:
-	if not load_game():
+	var latest: Dictionary = saves.resume_info()
+	if latest.is_empty() or not load_game(latest.path):
 		ui.title_continue.text = "Save unavailable — start new"
 		return
 	started = true
@@ -316,7 +344,7 @@ func to_title() -> void:
 	set_modal("")
 	get_tree().paused = true
 	ui.title.show()
-	ui.title_continue.disabled = not FileAccess.file_exists(save_path())
+	ui.title_continue.disabled = not saves.has_resume()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func set_modal(kind: String) -> void:
@@ -331,6 +359,7 @@ func set_modal(kind: String) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if started and kind=="" and not reporting else Input.MOUSE_MODE_VISIBLE
 	blocking = false
 	if kind=="pause":
+		ui.checkpoint_button.disabled = not saves.has_resume()
 		ui.pause_panel.show()
 	elif kind=="inventory":
 		state.pack.sync(state.inventory)
@@ -356,7 +385,9 @@ func _physics_process(dt: float) -> void:
 	for key in state.ability_cooldowns:
 		state.ability_cooldowns[key] = maxf(0,state.ability_cooldowns[key]-dt)
 	state.mana = minf(state.max_mana,state.mana+dt*0.8)
-	if not coop.active or coop.is_host: march.tick(dt)
+	if not coop.active or coop.is_host:
+		march.tick(dt)
+		woods.tick(dt)
 	state.elapsed += dt
 	road_return_clock += dt
 	if road_return_clock>=10.0:
@@ -408,7 +439,7 @@ func _physics_process(dt: float) -> void:
 	player.velocity.y -= 21*dt
 	player.move_and_slide()
 	player.position.x = clampf(player.position.x,-235,235)
-	player.position.z = clampf(player.position.z,-1010,85)
+	player.position.z = clampf(player.position.z,-1845,85)
 	if player.position.y<C.height_at(player.position.x,player.position.z)-12:
 		player.position = C.ground(Vector2(0,42),1.0)
 		message("The road's ember catches you. Returned to the inn.")
@@ -424,6 +455,7 @@ func _physics_process(dt: float) -> void:
 	audio.tick(dt,input.length()>0.1 and player.is_on_floor(),sprint)
 	update_location()
 	journey.tick(dt)
+	saves.tick(dt)
 	if not coop.active or coop.is_host: update_defence(dt)
 	if state.day_clock>=18 and not night_announced:
 		night_announced = true
@@ -449,7 +481,7 @@ func line_clear(a: Vector3, b: Vector3) -> bool:
 
 func near_safety() -> bool:
 	var p := Vector2(player.position.x,player.position.z)
-	return p.distance_to(Vector2(0,30))<37 or state.story.briefed and p.distance_to(Vector2(-65,-530))<23 and (state.story.verdict!="trial" or state.story.defense_done)
+	return state.woods.started and p.distance_to(Vector2(0,-1100))<38 or p.distance_to(Vector2(0,30))<37 or state.story.briefed and p.distance_to(Vector2(-65,-530))<23 and (state.story.verdict!="trial" or state.story.defense_done)
 
 func fire_distance(at: Vector3) -> float:
 	var closest := 9999.0
@@ -493,6 +525,7 @@ func update_location() -> void:
 		state.discovered[closest] = true
 		state.log_event("discovered:"+closest)
 		state.xp += 10
+		saves.request("A new place discovered")
 		ui.discover(C.SITES[closest].name,C.SITES[closest].sub)
 		audio.play_effect("quest")
 
@@ -645,10 +678,14 @@ func respawn() -> void:
 	state.health = state.max_health
 	state.stamina = 100
 	state.inventory.gold = maxi(0,state.inventory.gold-8)
-	player.position = C.ground(Vector2(-65,-514) if state.story.briefed else Vector2(0,42),0.5)
+	player.position = C.ground(Vector2(-7,-1081) if state.woods.started and player.position.z< -1005 else Vector2(-65,-514) if state.story.briefed else Vector2(0,42),0.5)
 	player.velocity = Vector3.ZERO
 	player.rotation.y = 0
 	camera.rotation = Vector3.ZERO
+	if state.woods.started and player.position.z< -1005:
+		message("Hester brings you back to Alderwake. 8 coins lost; all evidence and experience kept.",8)
+		state.log_event("respawn_at_alderwake")
+		return
 	state.log_event("respawn_at_inn")
 	message("Nera brings you back to Saint Mere. 8 coins lost; quest records and experience kept." if state.story.briefed else "Mara finds you on the road. 8 coins lost; quest items and experience kept.",8)
 
@@ -814,6 +851,14 @@ func interact() -> void:
 		interact_object(found.id)
 
 func talk(id: String) -> void:
+	side_quests.active_id = ""
+	if id in woods.D.NPCS:
+		woods.talk(id)
+		return
+	if id=="pip":
+		dialogue_id = id
+		ui.show_dialog(id,Narrative.page("Pip, eleven, sorts carved animals by the inn hearth. 'Mara says I can ask for help without going into the woods myself. Have you seen a blue ribbon?'",[Narrative.choice("Tell me about the ribbon.","side:open:ribbon"),Narrative.choice("Stay warm, Pip.","leave")]))
+		return
 	state.journey.interest = 0.0
 	if id=="courier": state.discovered.met_courier = true
 	if modal!="dialog" or dialogue_id!=id: audio.greet(id)
@@ -834,9 +879,15 @@ func open_shop(id: String) -> void:
 	dialogue_id = id
 	shop_owner = id
 	var stock: Dictionary = state.inventory
-	ui.show_dialog(id,Narrative.page("Adela opens her travelling case.\n\n[color=#dec48e]Your purse: %d coins / Tonics: %d\nTo sell: %d pelts, %d essence, %d widow's bonnets.[/color]\n\nTonic: 8 coins. Adela pays 4 per pelt, 3 per essence and 1 per bonnet. Purchases and sales update your pack immediately." % [stock.gold,stock.tonic,stock.fur,stock.essence,stock.toadstools],[Narrative.choice("Buy a tonic. [8 coins]","buy_tonic"),Narrative.choice("Sell pelts, essence and bonnets.","sell_curios"),Narrative.choice("Back to the road business.","shop_back")]))
+	ui.show_dialog(id,Narrative.page("Adela opens her travelling case.\n\n[color=#dec48e]Your purse: %d coins / Tonics: %d\nTo sell: %d pelts, %d essence, %d widow's bonnets.[/color]\n\nWoodland curios: %d amber, %d salts, %d silver wire (12 coins each).\nTonic: 8 coins. Adela pays 4 per pelt, 3 per essence and 1 per bonnet. Purchases and sales update your pack immediately." % [stock.gold,stock.tonic,stock.fur,stock.essence,stock.toadstools,stock.get("amber",0),stock.get("salt",0),stock.get("wire",0)],[Narrative.choice("Buy a tonic. [8 coins]","buy_tonic"),Narrative.choice("Sell pelts and woodland curios.","sell_curios"),Narrative.choice("Back to the road business.","shop_back")]))
 
 func _local_choose_dialog(action: String) -> void:
+	if action.begins_with("woods:"):
+		woods.choose(action)
+		return
+	if action.begins_with("side:"):
+		side_quests.choose(action)
+		return
 	if action.begins_with("journey:"):
 		journey.choose(action)
 		return
@@ -991,6 +1042,9 @@ func _local_choose_dialog(action: String) -> void:
 		"journal": ui.show_map()
 		"sell_curios":
 			var income: int = state.inventory.fur*4+state.inventory.essence*3+state.inventory.toadstools
+			for key in ["amber","salt","wire"]:
+				income += state.inventory.get(key,0)*12
+				state.inventory[key] = 0
 			state.inventory.gold += income
 			state.inventory.fur = 0
 			state.inventory.essence = 0
@@ -1011,7 +1065,7 @@ func affordability(action: String) -> Dictionary:
 		if not ranger.active(): return {"allowed":false,"reason":"For a Ranger's pouch"}
 		if state.inventory["musket_cartridge" if action=="buy_musket_powder" else "pistol_cartridge"]>(116 if action=="buy_musket_powder" else 110): return {"allowed":false,"reason":"Not enough pouch space"}
 		return {"allowed":state.inventory.gold>=6,"reason":"Need 6 coins" if state.inventory.gold<6 else ""}
-	if action=="sell_curios" and state.inventory.fur+state.inventory.essence+state.inventory.toadstools==0:
+	if action=="sell_curios" and state.inventory.fur+state.inventory.essence+state.inventory.toadstools+state.inventory.get("amber",0)+state.inventory.get("salt",0)+state.inventory.get("wire",0)==0:
 		return {"allowed":false,"reason":"No pelts, essence or bonnets to sell"}
 	var costs := {"upgrade_sword":{"scrap":4,"gold":15},"upgrade_coat":{"scrap":3,"gold":12},"buy_tonic":{"gold":8},"rook_bread":{"bread":2},"rook_gold":{"gold":12}}
 	if action=="upgrade_sword" and state.flags.sword_upgrade:
@@ -1039,6 +1093,7 @@ func _local_harvest(id: String) -> void:
 
 func quest_reward(name_text: String, xp: int) -> void:
 	state.xp += xp
+	saves.request("Quest progress")
 	state.log_event("quest:"+name_text)
 	audio.play_effect("quest_complete",Vector3.INF,true)
 	message("%s · +%d experience" % [name_text,xp],5)
@@ -1053,11 +1108,19 @@ func take(id: String) -> void:
 	audio.play_effect("pickup")
 
 func _local_interact_object(id: String) -> void:
+	if id.begins_with("nw_"):
+		woods.interact(id)
+		return
+	if id.begins_with("side_"):
+		side_quests.interact(id)
+		return
 	if C.OBJECTS.has(id) and C.OBJECTS[id].has("loot"):
 		if state.taken.has(id): return
 		var items: Array[String] = []
 		for item in C.OBJECTS[id].loot:
 			var count: int = C.OBJECTS[id].loot[item]
+			if item in ["pistol_cartridge","musket_cartridge"]:
+				count = mini(count,maxi(0,122-int(state.inventory.get(item,0))))
 			state.inventory[item] += count
 			items.append("%d %s" % [count,item])
 		take(id)
@@ -1222,6 +1285,13 @@ func update_defence(dt: float) -> void:
 			message("Expedition complete. Talk to Adela beside the tower. Your journey is saved.",10)
 
 func target() -> Dictionary:
+	var side: Dictionary = side_quests.objective(state.tracked_side)
+	if not side.is_empty(): return side
+	return main_target()
+
+func main_target() -> Dictionary:
+	if state.woods.focus and state.story.bell_done or state.story.epilogue and not state.woods.started and int(state.story.track)==0:
+		return woods.objective()
 	var f: Dictionary = state.flags
 	if f.won:
 		return march.objective()
@@ -1253,7 +1323,7 @@ func target() -> Dictionary:
 
 func journal_text() -> String:
 	var f: Dictionary = state.flags
-	var lines: String = "[color=#e2c38a]THE ROAD NORTH[/color]\n" + target().text + "\n\n"
+	var lines: String = "[color=#e2c38a]THE ROAD NORTH[/color]\n" + main_target().text + "\n\n"
 	lines += "Oil and clapper can be gathered in either order. Ilya will meet you at Northwatch with Mara's provisions once both are found.\n\n"
 	for row in [[f.accepted,"Hear Mara's request"],[f.supplies,"Recover the caravan"],[f.scout,"Hear the scout's report"],[f.oil,"Bring oil from the mill"],[f.relic,"Recover the chapel's clapper"],[f.prepared,"Prepare with Ilya or Mara"],[f.won,"Restore and defend Northwatch"]]:
 		lines += ("[color=#92b79a]✓ " if row[0] else "[color=#a8b5ab]○ ") + row[1]+"[/color]\n"
@@ -1272,7 +1342,11 @@ func journal_text() -> String:
 		lines = march.journal()+"\n"+lines
 	var profile_data = preload("res://scripts/character_data.gd")
 	lines += "\n[color=#e2c38a]THIS TRAVELLER[/color]\n"+state.profile.name+" / "+str(int(state.profile.age))+" / "+profile_data.origin(state.profile.origin_id).name+"\n"+profile_data.profession(state.profile.profession_id).description+"\n"
-	lines += state.Progression.journal(state.profile.profession_id,state.xp)
+	lines += state.Progression.journal(state.profile.profession_id,state.xp,state.level_floor)
+	if state.woods.started and state.woods.focus: lines = woods.journal()+"\n"+lines
+	elif state.story.bell_done: lines += woods.journal()
+	if not state.tracked_side.is_empty(): lines = side_quests.tracked_journal()+"\n"+lines
+	lines += side_quests.journal()
 	lines += journey.journal()
 	lines += "\nDEEP WOODS\nDanger rises away from roads and inhabited places. Woodland hounds give way to Pitchbound and Boughstalkers; the remotest wilds hold pairs. Roads still have authored ambushes.\nTar on posts warns of Pitchbound: step out of their long poker's reach, then punish the slow recovery. Blocking takes chip damage; a timed parry stops it. High claw marks warn of Boughstalkers: interrupt their attack warning with a strike. Retreat toward shelter if outmatched.\n"
 	return lines
@@ -1312,34 +1386,20 @@ func snapshot() -> Dictionary:
 	if objective.has("pos"):
 		objective["position"] = [objective.pos.x,objective.pos.y]
 		objective.erase("pos")
-	return {"schema_version":5,"terrain_revision":C.TERRAIN_REVISION,"build":C.BUILD,"engine":Engine.get_version_info().string,"world_id":C.WORLD_ID,"area_id":"underchapel" if in_crypt() else "ashen_march" if player.position.z< -430 else "hollow_valley","layout_version":C.LAYOUT,"seed":C.SEED,"ambient_life":world.ambient.summary(),"player":{"eye_height":eye_height,"body_height":player_collision.shape.height,"position":[player.position.x,player.position.y,player.position.z],"yaw":player.rotation.y,"pitch":camera.rotation.x,"velocity":[player.velocity.x,player.velocity.y,player.velocity.z],"lantern":lantern.visible,"torch":torch_equipped},"state":state.to_dict(),"objective":objective,"location":ui.location.text if ui else location_id,"session":{"last_march_document":march.document_id,"creator_draft":ui.creator.profile() if modal=="creator" else {},"relationship":{"partner":relationship.active_id,"phase":relationship.phase,"committed":relationship.committed,"transition_seconds":relationship.clock},"modal":modal,"dialogue_id":dialogue_id,"attack_clock":attack_clock,"swing":swing,"swing_style":swing_style,"swing_duration":swing_duration,"blocking":blocking,"block_age":block_age,"started":started},"system":{"os":OS.get_name(),"gpu":RenderingServer.get_video_adapter_name(),"viewport":[get_viewport().size.x,get_viewport().size.y],"fps":Engine.get_frames_per_second(),"memory_mb":snappedf(Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0,0.1),"process_ms":snappedf(Performance.get_monitor(Performance.TIME_PROCESS)*1000,0.01)},"combat_runtime":combat.record(),"profession_combat":combat.summary(),"soundtrack":audio.summary(),"visual_settings":visuals.summary(),"runtime_log_tail":runtime_tail()}
+	return {"schema_version":5,"terrain_revision":C.TERRAIN_REVISION,"build":C.BUILD,"engine":Engine.get_version_info().string,"world_id":C.WORLD_ID,"area_id":"underchapel" if in_crypt() else "rowan_march" if player.position.z< -1005 else "ashen_march" if player.position.z< -430 else "hollow_valley","layout_version":C.LAYOUT,"seed":C.SEED,"ambient_life":world.ambient.summary(),"player":{"eye_height":eye_height,"body_height":player_collision.shape.height,"position":[player.position.x,player.position.y,player.position.z],"yaw":player.rotation.y,"pitch":camera.rotation.x,"velocity":[player.velocity.x,player.velocity.y,player.velocity.z],"lantern":lantern.visible,"torch":torch_equipped},"state":state.to_dict(),"objective":objective,"location":ui.location.text if ui else location_id,"session":{"last_march_document":march.document_id,"creator_draft":ui.creator.profile() if modal=="creator" else {},"relationship":{"partner":relationship.active_id,"phase":relationship.phase,"committed":relationship.committed,"transition_seconds":relationship.clock},"modal":modal,"dialogue_id":dialogue_id,"attack_clock":attack_clock,"swing":swing,"swing_style":swing_style,"swing_duration":swing_duration,"blocking":blocking,"block_age":block_age,"started":started},"system":{"os":OS.get_name(),"gpu":RenderingServer.get_video_adapter_name(),"viewport":[get_viewport().size.x,get_viewport().size.y],"fps":Engine.get_frames_per_second(),"memory_mb":snappedf(Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0,0.1),"process_ms":snappedf(Performance.get_monitor(Performance.TIME_PROCESS)*1000,0.01)},"combat_runtime":combat.record(),"profession_combat":combat.summary(),"soundtrack":audio.summary(),"visual_settings":visuals.summary(),"runtime_log_tail":runtime_tail()}
 
 func save_game() -> bool:
-	var path := save_path()
-	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	var f := FileAccess.open(path+".tmp",FileAccess.WRITE)
-	if f==null:
-		message("Save failed: "+error_string(FileAccess.get_open_error()))
-		return false
-	f.store_string(JSON.stringify(snapshot(),"\t"))
-	f.close()
-	if FileAccess.file_exists(path):
-		var old := FileAccess.get_file_as_bytes(path)
-		var backup := FileAccess.open(path+".bak",FileAccess.WRITE)
-		if backup==null:
-			message("Save backup failed. Existing save kept.")
-			return false
-		backup.store_buffer(old)
-		backup.close()
-		if DirAccess.remove_absolute(path)!=OK:
-			message("Cannot replace save. Previous save kept.")
-			return false
-	var err := DirAccess.rename_absolute(path+".tmp",path)
-	if err!=OK:
-		message("Save finalization failed. Backup and temporary file retained.")
+	var payload: Dictionary = snapshot()
+	payload.save_kind = "manual"
+	payload.saved_at_unix = Time.get_unix_time_from_system()
+	var result: Dictionary = saves.write(save_path(),payload)
+	if not result.ok:
+		message(result.reason,8)
 		return false
 	state.log_event("manual_save")
-	message("Journey saved. F9 continues from this moment.")
+	saves.pending = ""
+	saves.elapsed = 0
+	message("Journey saved. F9 restores this manual save.")
 	return true
 
 func validate_save(d: Variant) -> bool:
@@ -1359,20 +1419,20 @@ func validate_save(d: Variant) -> bool:
 	var candidate = State.new()
 	return candidate.read_dict(d.state,int(d.schema_version))
 
-func load_game() -> bool:
-	var path := save_path()
-	if not FileAccess.file_exists(path):
-		message("No journey saved yet. F5 saves your progress.")
+func load_game(path_override := "") -> bool:
+	var chosen: Dictionary = saves.load_choice(path_override)
+	if chosen.is_empty():
+		message("No valid save found. Existing saves and recovery copies were kept.",8)
 		return false
-	var d = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not validate_save(d):
-		message("Save is invalid or from another layout. It was not changed. A .bak may be recoverable.",8)
-		return false
+	var path: String = chosen.path
+	var d: Dictionary = chosen.payload
 	var candidate = State.new()
 	candidate.read_dict(d.state,int(d.schema_version))
 	combat.reset()
 	audio.reset_effects()
 	state = candidate
+	saves.reset()
+	ui.reset_progression()
 	journey.reset()
 	if weeper_director: weeper_director.announced = state.weeper_world.introduced
 	player_stagger = 0
@@ -1387,7 +1447,7 @@ func load_game() -> bool:
 	apply_player_stature()
 	world.ambient.reset()
 	var p: Array = d.player.position
-	player.position = Vector3(clampf(p[0],-235,235),p[1],clampf(p[2],-1010,85))
+	player.position = Vector3(clampf(p[0],-235,235),p[1],clampf(p[2],-1845,85))
 	if d.get("terrain_revision",0)!=C.TERRAIN_REVISION:
 		player.position.y += C.height_at(player.position.x,player.position.z)-C.legacy_height_at(player.position.x,player.position.z)
 		player.position.y = maxf(player.position.y,world.surface_height(player.position)+.04)
@@ -1409,7 +1469,7 @@ func load_game() -> bool:
 	combat.restore(d.get("combat_runtime",{}))
 	state.log_event("manual_load")
 	night_announced = state.day_clock>=18
-	message("Journey restored. Your discoveries and choices remain.")
+	message("Journey recovered from a backup. Your original files were kept." if path.ends_with(".bak") else "Automatic checkpoint restored. Your manual save is unchanged." if d.get("save_kind","")=="auto" else "Journey restored. Your discoveries and choices remain.",7)
 	return true
 
 func open_report() -> void:
@@ -2524,11 +2584,21 @@ func romance_check() -> void:
 	await preload("res://scripts/romance_checks.gd").new().run(self)
 	get_tree().quit()
 
+func progress_stamp() -> int:
+	return hash([state.flags,state.story,state.woods,state.taken,state.relationships,state.keepsakes,state.xp])
+
 func choose_dialog(action: String) -> void:
-	coop.transact("npc",dialogue_id,"_local_choose_dialog",[action])
+	var before := progress_stamp()
+	if action.begins_with("woods:") and woods.origin.begins_with("nw_") and woods.near(woods.origin):
+		coop.transact("object",woods.origin,"_local_choose_dialog",[action])
+	else:
+		coop.transact("npc",dialogue_id,"_local_choose_dialog",[action])
+	if before!=progress_stamp(): saves.request("A conversation changed the journey")
 
 func interact_object(id: String) -> void:
+	var before := progress_stamp()
 	coop.transact("object",id,"_local_interact_object",[id])
+	if before!=progress_stamp(): saves.request("A discovery recorded")
 
 func harvest(id: String) -> void:
 	coop.transact("forage",id,"_local_harvest",[id])
@@ -2550,3 +2620,27 @@ func godrays_check() -> void:
 
 func weeper_check() -> void:
 	await preload("res://scripts/weeper_checks.gd").new().run(self)
+
+func side_quest_check() -> void:
+	await preload("res://scripts/side_quest_checks.gd").new().run(self)
+
+func woods_check() -> void:
+	await preload("res://scripts/woods_checks.gd").new().run(self)
+
+func woods_preview() -> void:
+	await preload("res://scripts/woods_checks.gd").new().preview(self)
+
+func woods_capture() -> void:
+	await preload("res://scripts/woods_checks.gd").new().captures(self)
+
+func woods_route() -> void:
+	await preload("res://scripts/woods_checks.gd").new().route(self)
+
+func level_check() -> void:
+	await preload("res://scripts/level_checks.gd").new().run(self)
+
+func safety_check() -> void:
+	await preload("res://scripts/safety_checks.gd").new().run(self)
+
+func journal_check() -> void:
+	await preload("res://scripts/journal_checks.gd").new().run(self)

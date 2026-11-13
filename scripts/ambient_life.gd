@@ -114,7 +114,7 @@ func hide_instance(view: MultiMeshInstance3D, index: int) -> void:
 	view.multimesh.set_instance_transform(index,Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO))
 
 func patch(p: Vector2) -> bool:
-	if absf(p.x)>225 or p.y< -1000 or p.y>75: return false
+	if absf(p.x)>225 or p.y< -1830 or p.y>75: return false
 	if p.x>98 and p.x<166 and p.y< -354 and p.y> -435: return false
 	if not game.world.outside_buildings(p,3.0): return false
 	for npc in game.world.npcs.values():

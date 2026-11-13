@@ -2,6 +2,7 @@ extends CanvasLayer
 
 var creator: Control
 var coop_menu: Control
+var woods_button: Button
 var powder_button: Button
 var road_services_button: Button
 var private_panel: Control
@@ -65,6 +66,8 @@ var current_choices: Array = []
 var map_panel: Panel
 var map_view: Control
 var journal: RichTextLabel
+var save_status: Label
+var checkpoint_button: Button
 var quest_track: OptionButton
 var report_panel: Panel
 var report_entry: TextEdit
@@ -72,6 +75,14 @@ var report_error: Label
 var pause_panel: Panel
 var toast_timer := 0.0
 var discovery_timer := 0.0
+var level_banner: Panel
+var level_title: Label
+var level_detail: Label
+var level_timer := 0.0
+var observed_level := 1
+var observed_state: RefCounted
+var pending_levels: Array[int] = []
+var pending_quest_updates: Array[Dictionary] = []
 var damage_flash := 0.0
 var title_continue: Button
 var dialog_feedback: Label
@@ -455,6 +466,10 @@ func build() -> void:
 	health_bar = bar(Vector2(30,628),Vector2(225,11),Color("a76651"),hud_root)
 	stamina_bar = bar(Vector2(30,648),Vector2(180,6),Color("b9ac77"),hud_root)
 	health_text = label("",Vector2(30,599),17,hud_root)
+	save_status = label("",Vector2(30,575),14,hud_root)
+	save_status.size.x = 260
+	save_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	save_status.add_theme_color_override("font_color",Color("aec6a5"))
 	resources = label("",Vector2(30,668),16,hud_root)
 	prompt = label("",Vector2(320,572),21,hud_root)
 	prompt.size = Vector2(640,35)
@@ -470,6 +485,17 @@ func build() -> void:
 	discovery_sub = label("",Vector2(240,248),17,hud_root)
 	discovery_sub.size.x = 800
 	discovery_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_banner = panel(Vector2(320,360),Vector2(640,170),hud_root)
+	level_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_title = label("",Vector2(16,10),30,level_banner,true)
+	level_title.size.x = 608
+	level_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_title.add_theme_color_override("font_color",Color("ffe3a0"))
+	level_detail = label("",Vector2(20,57),17,level_banner)
+	level_detail.size = Vector2(600,105)
+	level_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	level_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_banner.hide()
 	enemy_name = label("",Vector2(470,474),18,hud_root,true)
 	enemy_name.size.x = 340
 	enemy_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -484,15 +510,20 @@ func build() -> void:
 	make_dialog()
 	make_map()
 	make_report()
-	pause_panel = panel(Vector2(410,180),Vector2(460,350),self)
+	pause_panel = panel(Vector2(410,140),Vector2(460,430),self)
 	label("A MOMENT'S REST",Vector2(45,30),25,pause_panel,true)
 	button("Resume expedition",Vector2(35,95),Vector2(390,48),pause_panel,func(): game.set_modal(""))
 	button("Save and return to title",Vector2(35,215),Vector2(390,48),pause_panel,func():
 		if game.save_game():
 			game.to_title()
 	)
-	label("Esc resumes · ` records a field note",Vector2(55,298),16,pause_panel)
+	label("Esc resumes · ` records a field note",Vector2(55,378),16,pause_panel)
 	button("Settings",Vector2(35,155),Vector2(390,48),pause_panel,func(): open_settings("pause"))
+	checkpoint_button = button("Load latest checkpoint",Vector2(35,275),Vector2(390,48),pause_panel,func():
+		var latest: Dictionary = game.saves.resume_info()
+		if not latest.is_empty() and game.load_game(latest.path): game.set_modal("")
+	)
+	checkpoint_button.tooltip_text = "Restore the newest valid manual save or automatic checkpoint."
 	pause_panel.hide()
 	backpack = preload("res://scripts/backpack_ui.gd").new()
 	backpack.game = game
@@ -546,10 +577,11 @@ func make_title() -> void:
 	veil.size = Vector2(1280,720)
 	title.add_child(veil)
 	label("T H E   L A S T   R O A D S",Vector2(75,125),39,title,true)
-	label("BELLS OF THE HOLLOW / THE NAMES WE CARRY",Vector2(78,185),23,title,true)
+	label("BELLS OF THE HOLLOW / THE NAMES WE CARRY / THE ROWAN MARCH",Vector2(78,185),23,title,true)
 	label("The last road north has gone dark.\nA stolen caravan. A silent chapel. A bell that rings for nobody.\n\nThere are still people worth finding out there.\nAnd one fire left to light.",Vector2(80,260),22,title)
 	button("Begin a new journey",Vector2(80,453),Vector2(290,54),title,func(): open_creator())
 	title_continue = button("Continue journey",Vector2(386,453),Vector2(260,54),title,func(): game.continue_game())
+	title_continue.tooltip_text = "Continue the newest valid manual save or automatic checkpoint."
 	button("Settings",Vector2(662,453),Vector2(180,54),title,func(): open_settings("title"))
 	button("Exit game",Vector2(858,453),Vector2(180,54),title,func(): game.get_tree().quit())
 	button("Co-op / Steam friends",Vector2(80,517),Vector2(350,40),title,func(): coop_menu.open())
@@ -570,8 +602,16 @@ func make_dialog() -> void:
 	dialog_name = label("",Vector2(325,25),32,modal,true)
 	dialog_role = label("",Vector2(327,72),17,modal)
 	dialog_role.add_theme_color_override("font_color",Color("b9aa7c"))
+	woods_button = button("Rowan March case",Vector2(900,28),Vector2(220,42),modal,func(): game.choose_dialog("woods:case_record" if game.dialogue_id in game.woods.D.NPCS else "woods:lead"))
 	powder_button = button("Paper cartridges",Vector2(650,28),Vector2(230,42),modal,func(): game.open_powder_shop(game.dialogue_id))
 	road_services_button = button("Road services",Vector2(900,77),Vector2(220,32),modal,func(): game.journey.services())
+	for header_button in [powder_button,road_services_button,woods_button]:
+		header_button.add_theme_font_size_override("font_size",15)
+		for style_name in ["normal","hover","pressed"]:
+			var compact: StyleBoxFlat = header_button.get_theme_stylebox(style_name).duplicate()
+			compact.content_margin_top = 4
+			compact.content_margin_bottom = 4
+			header_button.add_theme_stylebox_override(style_name,compact)
 	dialog_body = RichTextLabel.new()
 	dialog_body.position = Vector2(327,115)
 	dialog_body.size = Vector2(790,250)
@@ -581,16 +621,22 @@ func make_dialog() -> void:
 	modal.add_child(dialog_body)
 	dialog_feedback = label("",Vector2(327,370),15,modal)
 	dialog_feedback.add_theme_color_override("font_color",Color("ec9b8b"))
-	for i in range(3):
+	for i in range(5):
 		var index := i
 		var b := button("",Vector2(325,400+i*54),Vector2(795,46),modal,func(): choose(index))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		for style_name in ["normal","hover","pressed"]:
+			var style: StyleBoxFlat = b.get_theme_stylebox(style_name).duplicate()
+			style.content_margin_top = 3
+			style.content_margin_bottom = 3
+			b.add_theme_stylebox_override(style_name,style)
 		choices.append(b)
 	dialog_controls_label = label("",Vector2(325,575),14,modal)
 	modal.hide()
 
 func show_dialog(id: String, d: Dictionary) -> void:
 	d = game.relationship.dialogue_choices(id,d)
+	d = game.side_quests.dialogue_choices(id,d)
 	game.set_modal("dialog")
 	var spec: Dictionary = game.C.NPCS[id]
 	dialog_portrait.show()
@@ -598,6 +644,7 @@ func show_dialog(id: String, d: Dictionary) -> void:
 	dialog_name.text = spec.name
 	dialog_role.text = spec.role
 	powder_button.visible = game.state.profile.profession_id=="ranger" and id in game.C.AMMO_SELLERS
+	woods_button.visible = id in game.woods.D.NPCS or id in ["nera","anselm"] and game.state.story.bell_done
 	road_services_button.visible = id in game.journey.CONTACTS
 	dialog_body.text = d.body
 	dialog_body.call_deferred("scroll_to_line",0)
@@ -605,7 +652,9 @@ func show_dialog(id: String, d: Dictionary) -> void:
 	update_control_hints()
 	dialog_feedback.text = ""
 	dialog_feedback.add_theme_color_override("font_color",Color("ec9b8b"))
-	for i in range(3):
+	for i in range(5):
+		choices[i].position.y = 400+i*(34 if current_choices.size()>3 else 54)
+		choices[i].size.y = 32 if current_choices.size()>3 else 46
 		choices[i].visible = i<current_choices.size()
 		if i<current_choices.size():
 			choices[i].text = "%d   %s" % [i+1,current_choices[i].text]
@@ -639,7 +688,12 @@ func make_map() -> void:
 	map_view.size = Vector2(660,600)
 	map_view.clip_contents = true
 	map_panel.add_child(map_view)
-	button("Hollow / March map",Vector2(28,30),Vector2(220,32),map_panel,func(): map_view.region = 1-map_view.region; map_view.queue_redraw())
+	button("Cycle map / 3 regions",Vector2(28,30),Vector2(240,32),map_panel,func(): map_view.region = posmod(map_view.region+1,3); map_view.queue_redraw())
+	button("Show objective",Vector2(288,30),Vector2(190,32),map_panel,func():
+		var goal: Dictionary = game.target()
+		if goal.has("pos"): map_view.region = map_view.sheet(goal.pos)
+		map_view.queue_redraw()
+	)
 	label("THE ROADKEEPER'S JOURNAL",Vector2(707,24),22,map_panel,true)
 	button("Personal keepsakes",Vector2(709,552),Vector2(300,36),map_panel,show_keepsake)
 	button("Travel",Vector2(1020,552),Vector2(160,36),map_panel,func(): game.journey.travel_menu())
@@ -648,28 +702,56 @@ func make_map() -> void:
 	quest_track = OptionButton.new()
 	quest_track.position = Vector2(709,65)
 	quest_track.size = Vector2(470,35)
-	for name_text in preload("res://scripts/march_content.gd").TRACKS:
-		quest_track.add_item(name_text)
 	map_panel.add_child(quest_track)
-	quest_track.item_selected.connect(func(index):
-		game.state.story.track = index
-		journal.text = game.journal_text()
-	)
+	rebuild_quest_tracks()
+	quest_track.item_selected.connect(select_quest_track)
 	journal.position = Vector2(709,113)
 	journal.size = Vector2(470,425)
 	journal.add_theme_font_size_override("normal_font_size",18)
 	journal.add_theme_color_override("default_color",Color("d6d4b9"))
 	map_panel.add_child(journal)
-	label("M / J / Esc closes · Gold ring: next destination · White arrow: you",Vector2(710,604),13,map_panel)
+	label("J / M / Esc: close  |  Gold: goal  |  White: you",Vector2(710,604),13,map_panel)
 	map_panel.hide()
 
 func show_map() -> void:
 	game.set_modal("map")
-	map_view.region = 1 if game.player.position.z< -425 and not game.in_crypt() else 0
-	quest_track.visible = game.state.flags.won
-	quest_track.select(int(game.state.story.track))
+	map_view.region = 2 if game.player.position.z< -1005 else 1 if game.player.position.z< -425 and not game.in_crypt() else 0
+	rebuild_quest_tracks()
+	quest_track.show()
 	journal.text = game.journal_text()
 	map_panel.show()
+
+func rebuild_quest_tracks() -> void:
+	quest_track.clear()
+	for title in preload("res://scripts/march_content.gd").TRACKS:
+		quest_track.add_item("II / "+title)
+		quest_track.set_item_disabled(quest_track.item_count-1,not game.state.flags.won)
+	for title in preload("res://scripts/woods_content.gd").TRACKS:
+		quest_track.add_item("III / "+title)
+		quest_track.set_item_disabled(quest_track.item_count-1,not game.state.story.bell_done)
+	quest_track.add_item("I / The Road North"+(" / complete" if game.state.flags.won else ""))
+	quest_track.set_item_disabled(13,game.state.flags.won)
+	var selected: int = 7+int(game.state.woods.track) if game.state.woods.focus and game.state.story.bell_done else int(game.state.story.track) if game.state.flags.won else 13
+	for id in game.side_quests.QUESTS:
+		if not game.side_quests.marked(id+":known") or game.side_quests.marked(id+":done"): continue
+		quest_track.add_item("Side / "+game.side_quests.QUESTS[id].title)
+		var index: int = quest_track.item_count-1
+		quest_track.set_item_metadata(index,id)
+		if game.state.tracked_side==id: selected = index
+	quest_track.select(selected)
+	quest_track.tooltip_text = "Track a chapter objective or a side story you have discovered."
+
+func select_quest_track(index: int) -> void:
+	if index>=14:
+		var id: String = quest_track.get_item_metadata(index)
+		if game.side_quests.marked(id+":known") and not game.side_quests.marked(id+":done"): game.state.tracked_side = id
+	else:
+		game.state.tracked_side = ""
+		game.state.woods.focus = index>=7 and index<13
+		if index>=7 and index<13: game.state.woods.track = index-7
+		elif index<7: game.state.story.track = index
+	journal.text = game.journal_text()
+	map_view.queue_redraw()
 
 func make_report() -> void:
 	report_panel = panel(Vector2(240,145),Vector2(800,430),self)
@@ -707,17 +789,59 @@ func update_control_hints() -> void:
 		footer_controls_label.visible = not game.controls.using_pad
 		footer_controls_label.text = "%s Journal & map    %s Save    %s Load    %s Field note    %s Pause" % [game.controls.hint("map"),game.controls.hint("save"),game.controls.hint("load"),game.controls.hint("report"),game.controls.hint("pause")]
 	if not dialog_controls_label: return
-	dialog_controls_label.text = "D-pad: choose · A/Cross: confirm · B/Circle: leave" if game.controls.using_pad else "%s / %s / %s choose · Esc leave conversation" % [game.controls.hint("slot1"),game.controls.hint("slot2"),game.controls.hint("slot3")]
+	var hints: Array[String] = []
+	for i in range(current_choices.size()): hints.append(game.controls.hint("slot"+str(i+1)))
+	dialog_controls_label.text = "D-pad: choose / A: confirm / B: leave" if game.controls.using_pad else " / ".join(hints)+" choose / Esc leave conversation"
+
+func reset_progression() -> void:
+	observed_state = game.state
+	observed_level = game.state.rank()
+	pending_levels.clear()
+	pending_quest_updates.clear()
+	level_timer = 0.0
+	if level_banner: level_banner.hide()
+
+func tick_progression(dt: float) -> void:
+	if observed_state!=game.state: reset_progression()
+	var current: int = game.state.rank()
+	if current>observed_level:
+		for level in range(observed_level+1,current+1):
+			pending_levels.append(level)
+			game.state.log_event("level_up:"+str(level))
+	observed_level = current
+	# Retain announcements earned during conversations until the player is back
+	# in the world. Reports and pause menus must not consume their display time.
+	var available: bool = game.started and game.modal=="" and not game.reporting
+	if available and level_timer<=0 and not pending_levels.is_empty():
+		var level: int = pending_levels.pop_front()
+		level_title.text = "LEVEL UP / LEVEL %d" % level
+		level_detail.text = game.state.Progression.TRACKS[game.state.profile.profession_id][level-1]
+		level_timer = 8.0
+		game.audio.play_effect("quest_complete",Vector3.INF,true)
+	if available and level_timer<=0 and pending_levels.is_empty() and not pending_quest_updates.is_empty():
+		var update: Dictionary = pending_quest_updates.pop_front()
+		level_title.text = update.title
+		level_detail.text = update.detail
+		level_timer = 10.0
+		game.audio.play_effect("quest_discovery",Vector3.INF,true)
+	level_banner.visible = available and level_timer>0
+	if level_banner.visible:
+		level_banner.modulate.a = minf(1.0,level_timer)
+		level_timer = maxf(0,level_timer-dt)
 
 func tick(dt: float) -> void:
+	tick_progression(dt)
 	update_control_hints()
+	save_status.text = game.saves.status if game.saves.status_left>0 else ""
 	var s = game.state
 	configure_equipment()
 	var profession := preload("res://scripts/character_data.gd").profession(s.profile.profession_id)
 	profession_label.text = "%s / %s\nC / V abilities%s" % [s.profile.name,profession.name," / Mana %d / %d" % [s.mana,s.max_mana] if s.max_mana>0 else ""]
 	var names: Array = s.prepared if s.profile.profession_id in ["mage","cleric"] else ["pistol","musket"] if s.profile.profession_id=="ranger" else ["second wind","driving strike"]
 	profession_label.text = "%s / %s%s" % [s.profile.name,profession.name," / Mana %d / %d" % [s.mana,s.max_mana] if s.max_mana>0 else ""]
-	profession_label.text += " / Rank %d / %d XP" % [s.rank(),s.xp]
+	var next_xp: int = s.Progression.next_threshold(s.xp,s.level_floor)
+	profession_label.text += " / Level %d / %d XP" % [s.rank(),s.xp]
+	if next_xp>0: profession_label.text += " / %d to next level" % (next_xp-s.xp)
 	if s.profile.profession_id=="ranger":
 		profession_label.text += "\nC: pistol %s / V: musket %s" % ["loaded" if s.ranger.pistol_loaded else "empty","loaded" if s.ranger.musket_loaded else "empty"]
 	else:
@@ -762,6 +886,9 @@ func tick(dt: float) -> void:
 	var t: Dictionary = game.target()
 	var dist := Vector2(game.player.position.x,game.player.position.z).distance_to(t.get("pos",Vector2.ZERO))
 	var title: String = preload("res://scripts/march_content.gd").TRACKS[int(s.story.track)].to_upper() if s.flags.won else "THE ROAD NORTH"
+	if s.woods.focus and s.woods.started: title = game.woods.D.TRACKS[int(s.woods.track)].to_upper()
+	elif s.story.epilogue and not s.woods.started and int(s.story.track)==0: title = "THE ROWAN MARCH / A NORTHERN APPEAL"
+	if not game.side_quests.objective(s.tracked_side).is_empty(): title = game.side_quests.QUESTS[s.tracked_side].title.to_upper()
 	tracker.text = title+"\n"+t.get("text","") + ("  ·  %dm" % dist if t.has("pos") else "")
 	var degrees := fposmod(rad_to_deg(-game.player.rotation.y),360)
 	var directions := ["N","NE","E","SE","S","SW","W","NW"]
@@ -1061,12 +1188,12 @@ func show_preparation() -> void:
 				if preparation_slots[1-index].selected==value:
 					preparation_slots[1-index].select((value+1)%select.item_count))
 		preparation_confirm = button("Memorise and continue",Vector2(170,300),Vector2(300,45),preparation_panel,func():
-			var list: Array = game.state.Progression.spells(game.state.profile.profession_id,game.state.xp)
+			var list: Array = game.state.Progression.spells(game.state.profile.profession_id,game.state.xp,game.state.level_floor)
 			game.state.prepared = [list[preparation_slots[0].selected],list[preparation_slots[1].selected]]
 			game.state.log_event("memorised:"+str(game.state.prepared))
 			game.set_modal("")
 			game.message("Prepared C: %s / V: %s" % [game.state.prepared[0].capitalize(),game.state.prepared[1].capitalize()],4))
-	var spells: Array = game.state.Progression.spells(game.state.profile.profession_id,game.state.xp)
+	var spells: Array = game.state.Progression.spells(game.state.profile.profession_id,game.state.xp,game.state.level_floor)
 	for index in range(2):
 		preparation_slots[index].clear()
 		for spell in spells: preparation_slots[index].add_item("%s / %d mana" % [spell.capitalize(),game.combat.COSTS[spell]])

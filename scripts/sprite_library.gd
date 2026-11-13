@@ -61,6 +61,9 @@ func cell(path: String, index: int, cols := 1, rows := 1) -> Texture2D:
 	return texture
 
 func npc(id: String, _blink := false) -> Texture2D:
+	if id in preload("res://scripts/woods_content.gd").NPCS:
+		return cell("res://assets/rowan/cast-atlas.png",preload("res://scripts/woods_content.gd").NPCS[id].cell,4,2)
+	if id=="pip": return cell("res://assets/pip.png",0)
 	if id in ["ilya","merchant"]:
 		return cell("res://assets/friends/npc-"+("ilya-girl1" if id=="ilya" else "merchant-girl2")+".png",0)
 	var poses := "res://assets/old-masters/npc-"+id+"-poses.png"

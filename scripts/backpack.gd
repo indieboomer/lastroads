@@ -3,6 +3,9 @@ extends RefCounted
 const WIDTH := 8
 const HEIGHT := 6
 const ITEMS := {
+	"wire":{"name": "Silver snare wire", "icon": 4, "use": "Recovered fine metal. Adela pays 12 coins.", "usable": false,"size":Vector2i(1,1)},
+	"salt":{"name": "Sealed mineral salts", "icon": 6, "use": "Preserved woodland reagent. Adela pays 12 coins.", "usable": false,"size":Vector2i(1,1)},
+	"amber":{"name": "Bog amber", "icon": 11, "use": "Woodland trade curio. Adela pays 12 coins.", "usable": false,"size":Vector2i(1,1)},
 	"graveward_resin":{"name":"Graveward resin","size":Vector2i(1,1),"icon":6,"use":"Coats your weapon with Old Faith alchemy for 120 seconds. Effective against the Hollow Weeper.","usable":true},
 	"burial_cloth":{"name":"Burial cloth","size":Vector2i(1,2),"icon":10,"use":"Moss-stained Old Faith burial linen. Crafting material.","usable":false},
 	"ancient_beads":{"name":"Ancient beads","size":Vector2i(1,1),"icon":11,"use":"Worn votive beads. Old Faith offering; a valuable curio.","usable":false},

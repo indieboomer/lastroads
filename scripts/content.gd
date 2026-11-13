@@ -1,6 +1,6 @@
 extends RefCounted
 
-const BUILD = "0.15.5-coop-preview"
+const BUILD = "0.17.0-roadkeepers"
 const AMMO_SELLERS = ["mara","osric","merchant","ilya","rook","lucan","garran"]
 const PLAYER_HEIGHT = 1.95
 const EYE_HEIGHT = 1.62
@@ -115,4 +115,13 @@ static func _static_init() -> void:
 	OBJECTS.merge(march.OBJECTS)
 	ENCOUNTERS.append_array(march.ENCOUNTERS)
 	ENEMY_TYPES.merge(march.ENEMY_TYPES)
+	preload("res://scripts/side_quests.gd").register(OBJECTS,NPCS,NPC_HEIGHTS)
+	var woods = preload("res://scripts/woods_content.gd")
+	NPC_HEIGHTS.merge(woods.HEIGHTS)
+	NPCS.merge(woods.NPCS)
+	SITES.merge(woods.SITES)
+	ROADS.append_array(woods.ROADS)
+	OBJECTS.merge(woods.OBJECTS)
+	ENCOUNTERS.append_array(woods.ENCOUNTERS)
+	ENEMY_TYPES.merge(woods.ENEMY_TYPES)
 	terrain.configure(ROADS)

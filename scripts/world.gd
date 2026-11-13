@@ -1,6 +1,7 @@
 extends Node3D
 
 const C = preload("res://scripts/content.gd")
+var woods_world = preload("res://scripts/woods_world.gd").new()
 var march_world = preload("res://scripts/march_world.gd").new()
 var game: Node
 var ambient: Node3D
@@ -215,6 +216,7 @@ func build() -> void:
 	build_marsh()
 	build_grove()
 	march_world.build(self)
+	woods_world.build(self)
 	settle_foundations()
 	add_child(forest)
 	preload("res://scripts/forest_caches.gd").register(self)
@@ -223,7 +225,7 @@ func build() -> void:
 	build_foraging()
 	for id in C.OBJECTS:
 		var d: Dictionary = C.OBJECTS[id]
-		if id in ["ash_winch","ash_raisa","ash_pavel","ash_memorial","ash_bell","ash_names_mateo","ash_names_elias","ash_names_alina","ash_candle_bridge","ash_candle_orchard","ash_coach"]:
+		if id in ["nw_notice","nw_caseboard","nw_body","nw_vent","nw_gate","nw_heart","nw_ward_west","nw_ward_east","nw_ward_north","nw_vigil","ash_winch","ash_raisa","ash_pavel","ash_memorial","ash_bell","ash_names_mateo","ash_names_elias","ash_names_alina","ash_candle_bridge","ash_candle_orchard","ash_coach"]:
 			# These are authored meshes, beds and votives, not extra standing stones.
 			var marker := Sprite3D.new()
 			add_child(marker)
@@ -637,8 +639,11 @@ func build_grove() -> void:
 func plant_forest() -> void:
 	var march_rng := RandomNumberGenerator.new()
 	march_rng.seed = 731940
-	for i in range(2600):
+	var woods_rng := RandomNumberGenerator.new()
+	woods_rng.seed = 913074
+	for i in range(4400):
 		var p := Vector2(randf_range(-230,230),randf_range(-418,80)) if i<1250 else Vector2(march_rng.randf_range(-230,230),march_rng.randf_range(-1005,-435))
+		if i>=2600: p = Vector2(woods_rng.randf_range(-230,230),woods_rng.randf_range(-1825,-1040))
 		if p.x>98 and p.x<166 and p.y<-354 and p.y> -430:
 			continue
 		if C.distance_to_road(p)<7:
@@ -649,11 +654,11 @@ func plant_forest() -> void:
 		for object_data in C.OBJECTS.values():
 			if p.distance_to(object_data.pos)<4.0: near_site = true
 		for s in C.SITES.values():
-			if p.distance_to(s.pos)<(26 if s.name=="Wayfarer's Rest" else 20):
+			if p.distance_to(s.pos)<float(s.get("clearing",26 if s.name=="Wayfarer's Rest" else 20)):
 				near_site = true
 		if near_site:
 			continue
-		var h: float = randf_range(10,19) if i<1250 else march_rng.randf_range(10,19)
+		var h: float = randf_range(10,19) if i<1250 else march_rng.randf_range(10,19) if i<2600 else woods_rng.randf_range(12,23)
 		if preload("res://scripts/weeper_sites.gd").reserved(p): continue
 		var tree := sprite("trees",i%4,4,1,C.ground(p,-0.15),h)
 		tree_locations.append(p)
@@ -779,6 +784,7 @@ func apply_state() -> void:
 	for id in npcs:
 		npc_anchors[id] = npcs[id].position
 		apply_npc_appearance(id)
+	woods_world.apply(self)
 	caravan.visible = game.state.flags.won
 	for id in ["rune_root","rune_flame","rune_bell"]:
 		objects[id].modulate = Color("a6e8df") if game.state.flags.get(id.trim_prefix("rune_"),false) else Color.WHITE

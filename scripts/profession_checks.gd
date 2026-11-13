@@ -212,7 +212,7 @@ func progression_review(g: Node) -> void:
 		var saved: Dictionary = g.state.to_dict()
 		saved.prepared[0] = learned
 		assert(not g.State.new().read_dict(saved,5),"Locked spells cannot be loaded")
-		g.state.xp = 160
+		g.state.xp = g.state.Progression.THRESHOLDS[2]
 		g.ui.show_preparation()
 		assert(g.ui.preparation_slots[0].item_count==3)
 		g.ui.preparation_slots[0].select(2)

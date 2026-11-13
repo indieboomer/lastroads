@@ -153,7 +153,7 @@ func build(w: Node3D) -> void:
 	for index in range(12):
 		var p := Vector2(20+(index%3)*4,-938-(index/3)*5)
 		cross(w,C.ground(p,1.0),0.65)
-	w.signpost(Vector2(5,-990),"THE NORTHERN ROAD\nA JOURNEY FOR ANOTHER DAY")
+	w.signpost(Vector2(5,-990),"ALDERWAKE / NORTH\nHESTER SEEKS WITNESSES")
 	for p in [Vector2(8,-439),Vector2(-200,-632)]:
 		var at := C.ground(p)
 		w.block(at+Vector3(0,0.4,0),Vector3(1.0,0.8,0.8),w.paint("stone"))

@@ -24,7 +24,11 @@ const QUESTIONS := {
 	"merchant":"What do you bring home that isn't for sale?"
 }
 
+func adult(id: String) -> bool:
+	return Options.PEOPLE.has(id) and Options.PEOPLE[id].get("age",0)>=18 and not game.C.NPCS.get(id,{}).get("minor",false)
+
 func dialogue_choices(id: String, d: Dictionary) -> Dictionary:
+	if not adult(id): return d
 	if not QUESTIONS.has(id) and id!="nera": return d
 	for option in d.choices:
 		if option.action.begins_with("personal:") or option.action.begins_with("journey:"): return d
@@ -44,6 +48,7 @@ func dialogue_choices(id: String, d: Dictionary) -> Dictionary:
 	return d
 
 func enter(id: String) -> void:
+	if not adult(id): return
 	if game.dialogue_id!=id: return
 	if id=="nera": game.march.choose("march:nera_personal")
 	elif id=="mara": open()
@@ -72,6 +77,7 @@ func portrait_texture(id := "") -> Texture2D:
 	return game.world.npc_portrait(id)
 
 func compatible(id: String) -> bool:
+	if not adult(id): return false
 	if not Options.PEOPLE.has(id): return false
 	var person: Dictionary = Options.PEOPLE[id]
 	return game.state.profile.age>=18 and game.state.profile.gender in person.interested_in and invitations_for(person.gender)
@@ -110,6 +116,7 @@ func reason() -> String:
 	return ""
 
 func safe() -> bool:
+	if not adult(active_id): return false
 	if game.state.health<=0 or game.in_crypt(): return false
 	if not game.world.npcs.has(active_id): return false
 	var anchor: Vector3 = game.world.npcs[active_id].position
@@ -120,6 +127,7 @@ func safe() -> bool:
 	return true
 
 func page(text: String, choices: Array) -> void:
+	if not adult(active_id): return
 	if game.coop.active:
 		text = text.replace("does not advance the world clock","does not pause the party's world")
 	if active_id=="mara" and not invitations_for("woman"):
@@ -144,6 +152,7 @@ func open() -> void:
 		page("For once, Mara lets the inn's accounts lie closed.\n\n'I used to think a full house meant I could stop being afraid. Turns out you can worry about twenty strangers as easily as one.'\n\nShe makes room at the table, with no bargain attached.",[N.choice("Tell me about your life before the inn.","personal:confide"),N.choice("I'd like to stay a little longer, with you.","personal:offer"),N.choice("A quiet moment is enough. Thank you.","personal:leave")])
 
 func choose(action: String) -> void:
+	if not adult(game.dialogue_id) or not adult(active_id): return
 	if game.reporting: return
 	if action.begins_with("personal:entry:"):
 		enter(action.get_slice(":",2))
@@ -249,6 +258,7 @@ func cancel() -> void:
 	update_appearance()
 
 func open_new(id: String) -> void:
+	if not adult(id): return
 	if game.reporting or id not in GENERIC: return
 	cancel()
 	active_id = id

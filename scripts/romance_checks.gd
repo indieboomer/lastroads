@@ -57,7 +57,7 @@ func run(g: Node) -> void:
 	for foe in g.enemies: foe.queue_free()
 	g.enemies.clear()
 	var options = g.relationship.Options
-	assert(options.PEOPLE.size()==9 and g.C.NPCS.size()==14,"Nine authored relationship paths")
+	assert(options.PEOPLE.size()==9 and g.C.NPCS.size()==23 and not options.PEOPLE.has("pip"),"Nine authored relationship paths")
 	g.visuals.values.intimacy = true
 	for id in options.PEOPLE:
 		for gender in ["man","woman","nonbinary"]:
@@ -180,4 +180,4 @@ func run(g: Node) -> void:
 	assert(g.validate_save(g.snapshot()))
 	await lucan(g)
 	await preload("res://scripts/relationship_expansion_checks.gd").new().run(g)
-	print("ROMANCE PASS: nine of fourteen NPCs, full gender/interest matrix, natural dialogue routing, three authored paths, locks/opt-out/decline/confirmation/cancellation, nine matched world/dialog assets and recovered Tomas, world restoration, all journal selectors, atomic saves and old-save migration")
+	print("ROMANCE PASS: nine adult paths among twenty-three NPCs, full gender/interest matrix, natural dialogue routing, three authored paths, locks/opt-out/decline/confirmation/cancellation, nine matched world/dialog assets and recovered Tomas, world restoration, all journal selectors, atomic saves and old-save migration")

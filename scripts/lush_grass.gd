@@ -110,13 +110,13 @@ func build_field() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 491827
 	for tx in range(-8,8):
-		for tz in range(-32,3):
+		for tz in range(-58,3):
 			var origin := Vector3((tx+.5)*TILE,0,(tz+.5)*TILE)
 			var transforms: Array[Transform3D] = []
 			for ix in range(40):
 				for iz in range(40):
 					var p := Vector2(tx*TILE+(ix+.5)*SPACING,tz*TILE+(iz+.5)*SPACING)+Vector2(rng.randf_range(-.22,.22),rng.randf_range(-.22,.22))
-					if p.x< -235 or p.x>235 or p.y< -1005 or p.y>65 or not allowed(p): continue
+					if p.x< -235 or p.x>235 or p.y< -1840 or p.y>65 or not allowed(p): continue
 					var height := rng.randf_range(.55,.95)
 					var width := rng.randf_range(1.05,1.45)
 					var basis := Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3(width,height,width))

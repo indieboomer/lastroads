@@ -241,12 +241,12 @@ func run(g: Node) -> void:
 	g.choose_dialog("buy_musket_powder")
 	verify(g.state.inventory.musket_cartridge==6 and g.state.inventory.pistol_cartridge==12 and g.state.inventory.gold==6,"Shop sells the selected ammunition type")
 	g.set_modal("")
-	g.state.xp = 160
+	g.state.xp = g.state.Progression.THRESHOLDS[2]
 	g.ranger.select("pistol")
 	g.ranger.reload()
 	verify(is_equal_approx(g.state.ranger.reload_total,3.2),"Rank three improves handling")
 	g.ranger.select("dagger")
-	g.state.xp = 550
+	g.state.xp = g.state.Progression.THRESHOLDS[4]
 	g.ranger.select("pistol")
 	g.state.ranger.pistol_loaded = true
 	g.ranger.steady = 1.1

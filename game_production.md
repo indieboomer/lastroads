@@ -1,6 +1,38 @@
 # The Last Roads — production record
 
-**Build:** `0.13.0-lush-hollow` · **Updated:** 9 November 2026 · **Engine:** Godot 4.5.1, GL Compatibility · **Playable:** Windows, single player.
+**Build:** `0.17.0-roadkeepers` · **Updated:** 12 November 2026 · **Engine:** Godot 4.5.1, GL Compatibility · **Playable:** Windows, single player.
+
+## 12 November / Roadkeeper reliability and guidance
+
+The priority for the next human session is retaining progress and making the nine smaller stories navigable. `save_slots.gd` now owns validated JSON writes, verified previous copies, three separate rotating automatic slots and selection/recovery. New progress and two-minute intervals request automatic saves; combat, airborne movement, attacks, reloads, conversations and reporting defer them. The manual slot is not an autosave target. Continue and the pause checkpoint button resume the newest valid slot; F9 preserves explicit manual-save behavior. Healthy backups survive corrupt primaries, and loading a recovery copy does not rewrite the original. Solo/co-op and preview/test save namespaces remain separate.
+
+Discovered unfinished side stories now participate in journal selection, map markers, compass/HUD objectives and persisted tracking. Both clue orders are retained, the next missing trace is chosen by distance, and return objectives use current NPC positions. Adela's pre-beacon availability and the underchapel exit are handled explicitly. Unknown stories do not appear in the active list, completion clears the active side track, and earlier chapter tracks remain selectable. The map has a Show objective button and a shorter legend. The level banner is moved below the reticle, and automatic-save status stays clear of the interaction prompt.
+
+The focused checks exercise actual disk replacement/backup recovery and resume semantics, safe-save deferral, independent co-op paths, normal journal choices, map/compass progress, moving NPCs, both clue orders, completion and migration. Standalone controls, level progression, cooperative protocol, chapter III, side-story, journey and smoke regressions complement the new tests. No new plot content, private scenes or upgrade-selection UI is introduced in this pass.
+
+
+## 12 November / Visible character levels
+
+The hidden, fast 60/160/320/550 XP rank curve is replaced for new travellers with 250/1,000/2,400/4,000 XP level milestones, targeting 10?15 minutes to level 2, about 30 minutes to level 3 and about one hour to level 4 on an exploratory route. Timing is a reward-budget estimate and needs playtest calibration. All existing quest, exploration, evidence and combat XP continues to count; no idle-time rewards or time gates are introduced.
+
+A separate, non-modal eight-second banner shows the new level and its existing automatic profession benefit. Quest toasts cannot replace it. Multiple levels queue independently, and dialogue/pause/reporting defer rather than consume the announcement. The status HUD uses the term Level and shows XP remaining. Level-up events are recorded with gameplay timestamps. Upgrade selection and a detailed progression dialog remain deferred.
+
+Save migration preserves old earned levels and spells using a validated, versioned level floor, while leaving XP and other progress intact. Fresh saves use the new curve. Notification baselines reset on new journeys and load so old rewards are not replayed. Coverage includes JSON roundtrips, every old level in all professions, equipped advanced spells, multiple gains and menu deferral; ranger, profession and smoke regressions accompany standalone packaging.
+
+
+## 12 November / The Shape of a Murder
+
+A third connected major chapter extends the road beyond the hospice to Alderwake, Blackwater Sluice, Rowan Sanctuary, the White Kiln, the Burned Assize, the Root Cellars, the Root Court and the Listening Oak. The physical terrain now reaches north to -1845; ten new authored road paths total approximately 2,074 metres. Existing world/layout identifiers and save destinations are retained. The original terrain grid aligns with its previous samples, inhabited pads remain level, and old saves receive a fresh chapter dictionary without altering previous flags, inventory, relationships or preferences.
+
+Seven new adults and one child form the northern cast. Oren's staged ritual murder is investigated through physical evidence, an accurate adult timeline, missing prisoners and the watch's protection contracts. Three corroborated deduction links are required before Bran can be confronted. Religious affiliation and Nell's optional recollection cannot establish guilt. The Old Faith's genuine shelter and costly willing offerings are distinguished from Vey's coerced pledges. The player independently chooses public hearing, exile/restitution or concealment, and a voluntary accord, severance or inheritance of the coercive debt: nine narrative outcome combinations, with separate confirmations and persistent aftermath. Rescue permits negotiation or force and requires a pressure vent before the release. Severance has a real three-knot shield mechanic and a new collector boss.
+
+The full-game target is roughly two hours including exploration; the third chapter is designed around 35?50 minutes. Automated traversal verifies movement, not human reading, investigation or combat pacing. Three northern travel stops, safe recovery, supply/ammunition chests, a third map sheet and six case tracks reduce repetitive backtracking. Cartridge loot is capped at the valid pouch capacity. Two optional kindnesses and a winter-store discovery add quieter consequences.
+
+Children Pip (eleven) and Nell (twelve) are excluded by the adult relationship allowlist and explicit minor checks. Direct private-entry/actions, portraits and active-partner appearance are regression-tested. Nell remains safe at Alderwake; her toy errand is optional, and every major ending works without meeting her. New NPC atlas artwork is original built-in generation with no real-person reference; the prompt specification is recorded in PLAYTEST.md. Authorized existing Ilya/Adela generated artwork remains included, with originals and generation metadata excluded from distributions.
+
+Validation includes all nine endings and intermediate save states; old-save migration; all new normal focus/E interactions; both rescues; physical walking of ten new roads; rendered landmarks and NPCs; boss shielding; shared-world progress with local tracking; earlier side stories and adult relationship routes; terrain, grass, inventory, professions, original quest access and standalone export checks. `Test-Chapter-Three.cmd` offers an isolated equipped preview. The normal launcher continues the player's existing journey.
+
+
 
 This is the current production document. `README_NEW.md` remains the broader design baseline; the earlier playtest notes and report write-ups are historical. The prototype now contains **two connected chapters, fourteen illustrated NPCs, fifteen named places, an adult character creator, consequential personal quests and two optional fade-to-black encounters**. The intended complete playthrough is approximately an hour. Reading speed, combat, exploration and optional stories affect that estimate; a timed human playthrough is still needed to establish a median.
 

@@ -118,6 +118,8 @@ func choose(action: String) -> void:
 	var q := s()
 	if a=="leave": game.set_modal(""); return
 	if a.begins_with("track_"):
+		game.state.tracked_side = ""
+		game.state.woods.focus = false
 		q.track = clampi(int(a.trim_prefix("track_")),0,D.TRACKS.size()-1)
 		game.set_modal("")
 		game.message("Tracking / "+D.TRACKS[q.track],4)
@@ -349,7 +351,7 @@ func objective() -> Dictionary:
 	for i in range(1,COMPLETION.size()):
 		if not q[COMPLETION[i]]: unfinished.append(D.TRACKS[i])
 	if q.epilogue and unfinished.is_empty():
-		return {"text":"All March quests complete. Return to the Hollow or keep exploring.","complete":true}
+		return {"text":"All March quests complete. A murder appeal waits north of the hospice in Alderwake.","complete":true}
 	if track>0 and q[COMPLETION[track]]:
 		return {"text":D.TRACKS[track]+" complete. Choose another tracked quest in J / M.","complete":true}
 	if track==1 and not q.medicine_done:
@@ -421,5 +423,5 @@ func epilogue() -> void:
 	lines += "Lucan has both pages of Mateo's letter.\n" if q.letters_done and q.letters_truth else "Lucan has the part of Mateo you chose to preserve.\n" if q.letters_done else "Two cups still wait in Lucan's hut.\n"
 	lines += "Raisa lives; Pavel is remembered.\n" if q.patient=="raisa" else "Pavel lives; Raisa is remembered.\n" if q.patient=="pavel" else "Nera's two beds still wait for your help.\n"
 	lines += "The ferry carries grain and travellers again.\n" if q.ferry_fixed else "The ferry still needs a sound rope.\n"
-	lines += "\nThe bell speaks for the living. There are no numbers beneath it now.\n\nYou can keep exploring, finish unfinished personal quests and return to friends in the Hollow. F5 saves this journey."
+	lines += "\nThe bell speaks for the living. There are no numbers beneath it now.\n\nA coroner named Hester has sent an appeal from Alderwake, north of the hospice. A murder is being blamed on the old woodland religion. The road beyond the hospice now leads there. Choose the Rowan March case in the journal, or follow the northern road.\n\nYou can keep exploring, finish unfinished personal quests and return to friends in the Hollow. F5 saves this journey."
 	page("nera",lines,[c("There are still people I want to see.","leave"),c("Follow the restored trade road.","travel_menu"),c("Stay for a little while.","nera_personal")])

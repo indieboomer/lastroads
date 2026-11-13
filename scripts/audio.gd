@@ -289,6 +289,7 @@ func greet(id: String) -> void:
 func enemy_event(kind: String, event: String, at: Vector3, key: String) -> void:
 	if kind=="pitchbound": kind = "bandit"
 	elif kind=="boughstalker": kind = "wraith"
+	elif kind=="rootwarden": kind = "mournkeeper"
 	var family := "warden" if kind=="guardian" else "unburied" if kind=="mournkeeper" else kind
 	var name := "boss_death" if event=="death" and kind in ["guardian","mournkeeper"] else family+"_"+event
 	throttled(name,key+":"+event,.6 if event=="hurt" else .8,at)

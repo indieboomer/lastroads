@@ -6,9 +6,10 @@ const STOPS := {
 	"inn":Vector2(0,42), "grove":Vector2(-77,-58),
 	"gate":Vector2(13,-102), "mill":Vector2(-111,-158),
 	"chapel":Vector2(122,-190), "tower":Vector2(7,-334),
-	"ash_refuge":Vector2(-61,-518), "ash_ferry":Vector2(135,-594)
+	"ash_refuge":Vector2(-61,-518), "ash_ferry":Vector2(135,-594),
+	"nw_village":Vector2(-7,-1081), "nw_sanctuary":Vector2(-143,-1316), "nw_court":Vector2(17,-1630)
 }
-const CONTACTS := ["mara","ilya","rook","sister","vesna","merchant","nera","lucan"]
+const CONTACTS := ["mara","ilya","rook","sister","vesna","merchant","nera","lucan","hester","maelin","vey"]
 var game: Node
 var menu_page := 0
 var stride_clock := 0.0
@@ -36,6 +37,7 @@ func resolved(id: String) -> bool:
 		"mill": return f.bargain or game.state.defeated.has("mill_enforcer_1") and game.state.defeated.has("mill_enforcer_2")
 		"chapel": return f.relic
 		"tower": return f.prepared and (not f.beacon_lit or f.won)
+		"nw_village", "nw_sanctuary", "nw_court": return game.state.woods.started
 		"ash_refuge", "ash_ferry": return f.won and game.state.story.ferry_fixed
 	return false
 
@@ -74,6 +76,9 @@ func speaker() -> String:
 		"mill": return "rook"
 		"chapel": return "sister"
 		"grove": return "vesna"
+		"nw_village": return "hester"
+		"nw_sanctuary": return "maelin"
+		"nw_court": return "vey"
 		"ash_refuge": return "nera"
 		"ash_ferry": return "lucan"
 		"tower": return "merchant" if game.state.flags.won else "ilya"
@@ -93,14 +98,16 @@ func services() -> void:
 		N.choice("Back to our conversation.","return")])
 
 func travel_menu(index := 0) -> void:
-	menu_page = posmod(index,4)
 	var ids: Array = STOPS.keys()
+	var pages := ceili(ids.size()/2.0)
+	menu_page = posmod(index,pages)
 	var choices: Array = []
 	for i in range(menu_page*2,menu_page*2+2):
+		if i>=ids.size(): break
 		var id: String = ids[i]
 		choices.append(N.choice(C.SITES[id].name,"journey:go:"+id))
-	choices.append(N.choice("More stops (%d/4). Esc closes." % (menu_page+1),"journey:menu:"+str(menu_page+1)))
-	page("Travel with the roadkeepers. Depart from a visited, secured stop. First visit each destination on foot and resolve its local trouble. No passage while danger waits at either end.\n\nThe inn, grove, toll, mill, chapel and Northwatch share the Hollow road. Repair the ferry to reach Saint Mere and Reedwater.",choices)
+	choices.append(N.choice("More stops (%d/%d). Esc closes." % [menu_page+1,pages],"journey:menu:"+str(menu_page+1)))
+	page("Travel with the roadkeepers. Depart from a visited, secured stop. First visit each destination on foot and resolve its local trouble. No passage while danger waits at either end.\n\nThe inn, grove, toll, mill, chapel and Northwatch share the Hollow road. Repair the ferry to reach Saint Mere and Reedwater. The northern stops at Alderwake, Rowan Sanctuary and the Root Court join the road after a first visit on foot.",choices)
 
 func errands() -> void:
 	page("Leave three yarrow for Vesna, or send three moonwort to Tomas after you have met him in the fen. A runner carries the medicine; the same agreed reward is paid here.\n\nYou can still deliver either medicine in person.",[

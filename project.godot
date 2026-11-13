@@ -3,7 +3,7 @@ config_version=5
 [application]
 config/name="The Last Roads - Bells of the Hollow"
 run/main_scene="res://loading.tscn"
-config/version="0.15.5"
+config/version="0.17.0"
 config/icon="res://assets/game-icon.svg"
 boot_splash/show_image=true
 boot_splash/image="res://assets/ui/loading-splash-copper-pine.png"

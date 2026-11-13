@@ -1,3 +1,74 @@
+# Roadkeeper playtest / 0.17.0
+
+This pass concentrates on protecting the existing adventure and making its side stories easier to follow. Downloadable builds are under `dist/TheLastRoads-0.17.0-Windows`.
+
+## Save safety
+
+The game now keeps three rotating automatic checkpoints, separate from the existing F5 manual save. Quest progress, dialogue decisions and discoveries request a checkpoint; a periodic checkpoint is also requested after two active minutes. Saving waits until the traveller is grounded, out of nearby danger, no longer attacking or reloading, and outside menus/reports. The lower-left HUD briefly confirms a successful automatic save. A failure is shown and retried later.
+
+**Continue journey** and **Load latest checkpoint** in the pause menu choose the newest valid manual/automatic save. **F9** retains its manual-save meaning, with recovery if that file is missing or damaged. Existing manual saves are never overwritten by an automatic checkpoint. Each committed slot is validated after JSON serialization and writing, retains a verified previous copy, and does not replace a healthy backup with a damaged primary. Recovery reads leave the original damaged files untouched.
+
+Solo checkpoints live beside `saves/hollow-valley.json` as `hollow-valley-auto-1.json` through `-3.json`. Co-op host and visitor files retain separate names and directories. Preview and automated test files remain isolated under `reports/`. Keep the whole saves folder when upgrading.
+
+## Quest guidance
+
+Every discovered, unfinished woodland side story can now be selected in J/M before the beacon is restored. Alternatively, use **Track this story** in its conversation. The HUD and compass track the nearer missing trace, the map shows both traces, and read traces turn green. Finding them in either order remains valid. Once both are found, the return marker uses the NPC's current world position, including Ilya and Tomas after relocation. Adela's story points to the unfinished beacon expedition until she can actually arrive.
+
+**Show objective** selects the correct regional map sheet. Side-story tracking persists through saving, switches cleanly back to chapter tracks, and clears after completion. Unknown side stories are absent from the selector; completed ones remain in the journal history. A tracked outside quest directs the traveller to the underchapel exit first. The level-up banner is now below the aiming reticle.
+
+## Verification
+
+`--safety-check` covers slot rotation, byte-for-byte manual-save preservation, verified overwrite/backup behavior, damaged-save recovery, newest Continue, manual F9 semantics, rejected payloads, safe deferral and co-op namespace separation. `--journal-check` covers discovered-only selection, both clue orders, moved contacts, pre-beacon Adela, chapter switching, completion cleanup, crypt navigation and save migration. Rendered captures are `reports/35-save-recovery-menu.png` and `reports/35-track-side-story.png`. Existing controls, levels, co-op, chapter III, side-story, journey and gameplay smoke checks are included in standalone packaging.
+
+---
+
+# Visible progression / 0.16.1
+
+A dedicated eight-second **LEVEL UP / LEVEL N** banner announces the existing automatic profession benefit. It remains separate from quest and exploration toasts, queues multiple levels, and waits while dialogue, pause or reporting obscures the world. The HUD now says **Level** and shows XP remaining until the next level. No upgrade-selection dialog has been added.
+
+Fresh-character XP thresholds are 0, 250, 1,000, 2,400 and 4,000. The reward-budget targets are level 2 around 10?15 minutes, level 3 around 30 minutes and level 4 around one hour. Actual times depend on route, reading and combat; idling never grants XP. Level-up events record the current elapsed gameplay time for future pacing review.
+
+Older saves retain their exact XP, previously earned levels, unlocked profession benefits and equipped advanced spells. A versioned minimum earned level prevents the pacing change from downgrading those travellers. Loading never repeats previously earned level messages. New saves use the new thresholds immediately.
+
+`--level-check` verifies threshold boundaries, message visibility/independence, pause/dialog deferral, multiple gains, the HUD, all four professions' legacy levels and advanced spells, and an actual JSON save/load. `reports/34-level-up.png` is the rendered check. Windows packaging is `dist/TheLastRoads-0.16.1-Windows`.
+
+---
+
+# Current playtest / Rowan March 0.16.0
+
+The game now has three connected chapters and nine new woodland side stories. The full-game pacing target is about two hours with exploration and reading. The third chapter targets roughly 35?50 minutes; the automated road traversal is about nine minutes of walking simulation and does not establish human playtime.
+
+Run `launch.cmd` to continue normally. After the hospice bell is freed in Chapter II, follow the northern road to Hester in Alderwake. Nera and Anselm also offer a **Rowan March case** button. `Test-Chapter-Three.cmd` starts an equipped rank-five traveller at Alderwake's approach and isolates saves/preferences under test files in `reports/`.
+
+The new Windows build and ZIP are under `dist/TheLastRoads-0.16.0-Windows`. Replace only the executable when upgrading an existing install; retain `saves/`, `settings.cfg` and `controls.cfg`.
+
+## Chapter III / spoiler-free route
+
+- Explore east toward Blackwater Sluice and the White Kiln, or west toward Rowan Sanctuary and the Burned Assize. Neither branch must be first.
+- Collect physical records, hear Sella's adult account, and compare cause, access and motive at Hester's board. Wrong deductions remain revisable.
+- Find the prisoner records at the eastern cellars. Negotiate with Vey at the Root Court or defeat the collectors. Open the side vent before the release.
+- Decide the murderer's disposition at Alderwake. This decision is independent of the woodland pact.
+- For an accord, read the sanctuary's refusal rules and obtain Sella's and Ada's own support after the rescue. For severance, face the collector and open all three binding knots. A darker inheritance is also possible.
+- Bring the final account to Hester. Returning Nell's toy boat, remembering Enna, and finding winter reserves remain optional.
+
+Use six Chapter III tracks in J/M and cycle all three map sheets. Three northern travel stops join the existing network after a first visit on foot. Hester provides safe free recovery; eight supply chests support all professions. Evidence and outcomes persist through death and saving. Existing saves without chapter data migrate to an unstarted investigation.
+
+## Current validation
+
+`--woods-check` covers all nine combinations of endings, both clue orders, early/unsupported accusations, normal focus/E access to every new NPC and quest object, peaceful and combat rescue, vent ordering, genuine boss shielding, repeated reward protection, old-save migration, chapter-state validation, three map sheets, travel pages and shared-world synchronization. `--woods-route` physically walks every northern road. `--woods-capture` renders the eight landmarks, Hester and Nell, and the third map sheet.
+
+The child checks cover both Pip and Nell with adult invitations enabled: absent personal choices, rejected direct personal actions, rejected direct private entry, no private portrait or world pose even if a minor is forcibly set as the active partner. Nell's testimony is unnecessary for every deduction and every ending. Children remain in safe settlements and never become ritual offerings or intimacy candidates.
+
+The broader checks cover side quests, adult relationship routes, terrain/level building pads, road geometry, grass clearings, co-op protocol, inventory, professions, original chapter access and save/load. The standalone Windows build is tested separately from source and audited to exclude source photos, developer saves, preferences and generation metadata.
+
+## Cast artwork provenance
+
+Built-in image generation produced `assets/rowan/cast-atlas.png`; no photographic references were used. The final asset is a transparent 4-by-2 atlas of seven adults and Nell, twelve. Each character is isolated by its atlas cell and rendered at an authored physical height. The prompt specified painterly Old Masters lighting, muted northern early-modern clothing, full-body silhouettes, transparent margins, fully clothed figures, and no text or scenery. The named subjects and ages were Hester 48, Bran 41, Maelin 63, Sella 34, Vey 52, Edric 57, Ada 30, Nell 12. Nell was explicitly specified as an unmistakable, non-sexualized preadolescent in a loose patched wool dress, boots and knitted hat, holding a toy boat. The same generated atlas supplies world figures and ordinary dialogue portraits; there are no private variants for this cast.
+
+---
+
+## Historical playtest notes
+
 # Bells of the Hollow — field-note update 0.3
 
 Run **`launch.cmd`**. Choose **Begin a new journey**, then speak to Mara in front of the inn. This is the expanded adventure, replacing the tiny First Ember scene. The old design document remains the long-term vision.
@@ -124,3 +195,26 @@ Check Osric outside his workshop, human eye level beside NPCs, stable character 
 - **Settings > World & effects:** visual wind strength (Off/Gentle/Normal/Strong), Small/Large blood and spectral splashes, and lightning flashes. Turning wind visuals off does not remove weather exposure. Lightning has visible bolts and delayed thunder.
 
 Latest report fixes also include the actual NPC glow-intersection seam, lower camera, grounded roots and Rook boots, stationary rock options, closed road bends, a longer stream, irregular pools, more windblown grass, Ilya acknowledging Tomas and closed crypt end-wall gaps. Existing schema-2/3 saves migrate on load; the next manual save uses schema 4. Automated tests use separate saves, settings and report folders.
+
+
+## Woodland side stories
+
+Talk to contacts and select **Off the road**, or discover either clue in the woods before meeting the contact. No main-story flags are required for evidence collection. Find both traces in either order, then return to the contact to choose an ending. The journal records directions, coordinates and progress. Revisiting clues and finished stories must never duplicate loot or experience.
+
+| Story | Contact | Theme |
+| --- | --- | --- |
+| Names Under the Charcoal | Sister Elian | Exploited workers and public remembrance |
+| The Price of Winter | Rook | Restitution after desperate theft |
+| A Measured Mercy | Vesna | End-of-life care, grief and medical privacy |
+| The Captain of Both Boots | Osric | A quartermaster's absurd missing boots |
+| A Bell for the Living | Mara | Institutional neglect and accountability |
+| Where the Ribbon Went | Pip; also introduced by Mara | Loss, honest answers and family support |
+| An Oath in the Moss | Ilya | Medical neutrality and protecting deserters |
+| The Saint of Stolen Spoons | Tomas | A magpie's accidental religious career |
+| What Was Never Yours | Adela | Coerced marriage, autonomy and refuge |
+
+Clues yield bog amber, sealed mineral salts or silver snare wire once each. Adela buys each for 12 coins; completion also gives experience and 8 coins. Existing saves without these inventory entries remain valid.
+
+Pip is eleven, remains at Wayfarer's Rest, and uses a separate fully clothed child illustration. Pip is excluded from the adult relationship allowlist. Verify no personal options, private portraits, private scenes or appearance changes occur, even when attempting direct personal action dispatch.
+
+Automated coverage: `tools\godot\Godot_v4.5.1-stable_win64_console.exe --headless --path . -- --side-quest-check`. Covers interaction access to all 18 clues, both clue orders, all 18 endings, save migration, duplicate rewards, trade and child relationship rejection. The existing `--romance-check` requires a rendering display for its screenshots.

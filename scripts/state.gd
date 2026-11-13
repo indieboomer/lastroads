@@ -3,16 +3,19 @@ extends RefCounted
 const Progression = preload("res://scripts/progression.gd")
 
 func rank() -> int:
-	return Progression.rank(xp)
+	return Progression.rank(xp,level_floor)
 
 var health := 100.0
 var max_health := 100.0
 var stamina := 100.0
 var xp := 0
+# Old saves retain levels already earned before the pacing rebalance.
+var level_floor := 1
+var tracked_side := ""
 var elapsed := 0.0
 var day_clock := 14.5
 var damage := 30.0
-var inventory := {"graveward_resin":0,"burial_cloth":0,"ancient_beads":0,"resin_tear":0,"pistol_cartridge":0,"musket_cartridge":0,"tonic":3,"bread":3,"wood":3,"gold":12,"scrap":0,"yarrow":0,"moonwort":0,"berries":0,"mushrooms":0,"toadstools":0,"fur":0,"essence":0}
+var inventory := {"amber":0,"salt":0,"wire":0,"graveward_resin":0,"burial_cloth":0,"ancient_beads":0,"resin_tear":0,"pistol_cartridge":0,"musket_cartridge":0,"tonic":3,"bread":3,"wood":3,"gold":12,"scrap":0,"yarrow":0,"moonwort":0,"berries":0,"mushrooms":0,"toadstools":0,"fur":0,"essence":0}
 var flags := {"accepted":false,"supplies":false,"scout":false,"bargain":false,"oil":false,"relic":false,"herbalist":false,"herbs_done":false,"courier":false,"courier_done":false,"prepared":false,"beacon_lit":false,"won":false,"sword_upgrade":false,"coat_upgrade":false,"grave":false,"letter":false,"keeper":false,"root":false,"flame":false,"bell":false}
 var taken: Dictionary = {}
 var defeated: Dictionary = {}
@@ -30,6 +33,7 @@ var pack = preload("res://scripts/backpack.gd").new()
 var wetness := 0.0
 var cold := 0.0
 var weather := {"phase":0,"age":0.0,"clock":0.0,"rain":0.0,"wind":0.18,"clouds":0.05,"flash":0.0,"thunder":-1.0,"strike_in":12.0}
+var woods: Dictionary = preload("res://scripts/woods.gd").DEFAULTS.duplicate(true)
 var story: Dictionary = preload("res://scripts/march.gd").DEFAULTS.duplicate(true)
 var profile: Dictionary = preload("res://scripts/character_data.gd").defaults()
 var mana := 0.0
@@ -61,9 +65,20 @@ func log_event(message: String) -> void:
 
 func to_dict() -> Dictionary:
 	pack.sync(inventory)
-	return {"journey":journey.duplicate(true),"road_returns":road_returns.duplicate(true),"weapon_resin_seconds":weapon_resin_seconds,"weeper_world":weeper_world.duplicate(true),"ranger":ranger.duplicate(true),"story":story.duplicate(true),"profile":profile.duplicate(true),"mana":mana,"max_mana":max_mana,"ability_cooldowns":ability_cooldowns.duplicate(),"prepared":prepared.duplicate(),"relationships":relationships.duplicate(),"keepsakes":keepsakes.duplicate(true),"health":health,"max_health":max_health,"stamina":stamina,"xp":xp,"elapsed":elapsed,"day_clock":day_clock,"damage":damage,"inventory":inventory.duplicate(true),"flags":flags.duplicate(true),"taken":taken.duplicate(true),"defeated":defeated.duplicate(true),"looted":looted.duplicate(true),"discovered":discovered.duplicate(true),"enemies":enemies.duplicate(true),"fires":fires.duplicate(true),"events":events.duplicate(true),"deaths":deaths,"wave":wave,"wave_timer":wave_timer,"backpack":pack.record(),"wetness":wetness,"cold":cold,"weather":weather.duplicate(true)}
+	return {"tracked_side":tracked_side,"progression_version":Progression.VERSION,"level_floor":level_floor,"woods":woods.duplicate(true),"journey":journey.duplicate(true),"road_returns":road_returns.duplicate(true),"weapon_resin_seconds":weapon_resin_seconds,"weeper_world":weeper_world.duplicate(true),"ranger":ranger.duplicate(true),"story":story.duplicate(true),"profile":profile.duplicate(true),"mana":mana,"max_mana":max_mana,"ability_cooldowns":ability_cooldowns.duplicate(),"prepared":prepared.duplicate(),"relationships":relationships.duplicate(),"keepsakes":keepsakes.duplicate(true),"health":health,"max_health":max_health,"stamina":stamina,"xp":xp,"elapsed":elapsed,"day_clock":day_clock,"damage":damage,"inventory":inventory.duplicate(true),"flags":flags.duplicate(true),"taken":taken.duplicate(true),"defeated":defeated.duplicate(true),"looted":looted.duplicate(true),"discovered":discovered.duplicate(true),"enemies":enemies.duplicate(true),"fires":fires.duplicate(true),"events":events.duplicate(true),"deaths":deaths,"wave":wave,"wave_timer":wave_timer,"backpack":pack.record(),"wetness":wetness,"cold":cold,"weather":weather.duplicate(true)}
 
 func read_dict(d: Dictionary, schema_version := 3) -> bool:
+	var loaded_side: Variant = d.get("tracked_side","")
+	if not loaded_side is String or not loaded_side.is_empty() and not preload("res://scripts/side_quests.gd").QUESTS.has(loaded_side): return false
+	var progression_version: Variant = d.get("progression_version",1)
+	if not progression_version is int and not progression_version is float: return false
+	if not is_finite(float(progression_version)) or progression_version!=floor(float(progression_version)) or int(progression_version) not in [1,Progression.VERSION]: return false
+	progression_version = int(progression_version)
+	var saved_floor: Variant = d.get("level_floor",1)
+	if not (saved_floor is int or saved_floor is float) or not is_finite(float(saved_floor)) or saved_floor!=floor(float(saved_floor)) or saved_floor<1 or saved_floor>5: return false
+	var loaded_floor := int(saved_floor)
+	var loaded_woods: Variant = d.get("woods",preload("res://scripts/woods.gd").DEFAULTS.duplicate(true))
+	if not preload("res://scripts/woods.gd").valid(loaded_woods): return false
 	var journey_record: Variant = d.get("journey",{"interest":0.0,"story":0.0,"observations":0})
 	if not journey_record is Dictionary: return false
 	for key in ["interest","story","observations"]:
@@ -105,11 +120,12 @@ func read_dict(d: Dictionary, schema_version := 3) -> bool:
 	for key in ["health","max_health","stamina","xp","elapsed","day_clock","damage","deaths","wave","wave_timer"]:
 		if not d.has(key) or not (d[key] is float or d[key] is int) or not is_finite(float(d[key])):
 			return false
+	if progression_version==1: loaded_floor = maxi(loaded_floor,Progression.legacy_rank(int(d.xp)))
 	for key in ["inventory","flags","taken","defeated","discovered","enemies"]:
 		if not d.get(key) is Dictionary:
 			return false
 	for key in inventory:
-		if key in ["burial_cloth","ancient_beads","resin_tear","graveward_resin"] and not d.inventory.has(key): continue
+		if key in ["amber","salt","wire","burial_cloth","ancient_beads","resin_tear","graveward_resin"] and not d.inventory.has(key): continue
 		if key in ["pistol_cartridge","musket_cartridge"] and ammo_version<3: continue
 		if schema_version==2 and key in ["berries","mushrooms","toadstools","fur","essence"] and not d.inventory.has(key):
 			continue
@@ -195,7 +211,7 @@ func read_dict(d: Dictionary, schema_version := 3) -> bool:
 			if d.relationships.get(id+"_evening",false)!=d.keepsakes.get(id+"_lamplight",false): return false
 		var allowed: Array = preload("res://scripts/profession_combat.gd").SPELLS.get(loaded_profile.profession_id,[])
 		var loaded_slots: Variant = d.get("prepared",allowed)
-		allowed = Progression.spells(loaded_profile.profession_id,int(d.xp))
+		allowed = Progression.spells(loaded_profile.profession_id,int(d.xp),loaded_floor)
 		if not loaded_slots is Array or loaded_slots.size()!=(2 if loaded_profile.profession_id in ["mage","cleric"] else 0): return false
 		for spell in loaded_slots:
 			if spell not in allowed or loaded_slots.count(spell)!=1: return false
@@ -211,9 +227,12 @@ func read_dict(d: Dictionary, schema_version := 3) -> bool:
 	health = clampf(d.health,1,max_health)
 	stamina = clampf(d.stamina,0,100)
 	xp = maxi(0,int(d.xp))
+	level_floor = loaded_floor
+	tracked_side = loaded_side
 	elapsed = maxf(0,d.elapsed)
 	day_clock = fposmod(d.day_clock,24)
 	damage = clampf(d.damage,16,47)
+	woods = loaded_woods.duplicate(true)
 	inventory.merge(d.inventory.duplicate(true),true)
 	ranger = preload("res://scripts/ranger_combat.gd").defaults()
 	ranger.merge(ranger_record.duplicate(true),true)

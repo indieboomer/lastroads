@@ -417,7 +417,7 @@ func handle_input(ev: InputEvent) -> bool:
 				if pressed("slot"+str(i+1),ev): game.ui.backpack.handle_key(KEY_1+i); return true
 		elif game.modal=="map" and pressed("map",ev): game.set_modal(""); return true
 		elif game.modal=="dialog":
-			for i in range(3):
+			for i in range(game.ui.current_choices.size()):
 				if pressed("slot"+str(i+1),ev): game.ui.choose(i); return true
 		return false
 	if ev is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
